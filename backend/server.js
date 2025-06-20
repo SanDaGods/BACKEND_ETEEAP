@@ -27,7 +27,7 @@ app.use(cookieParser());
 app.use(
   cors({
     origin: [
-      "https://updated-frontend-ten.vercel.app", // <-- your Vercel frontend
+      "https://frontendeteeap-production.up.railway.app/", // <-- your Vercel frontend
       "http://localhost:3000",                   // <-- for local testing
     ],
     credentials: true,
