@@ -23,21 +23,18 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// ✅ CORS: Allow your frontend URLs
+// ✅ **FIXED CORS CONFIGURATION**
 app.use(
   cors({
     origin: [
-      "https://frontendeteeap-production.up.railway.app/", // <-- your Vercel frontend
-      "http://localhost:3000",                   // <-- for local testing
+      "https://frontendeteeap-production.up.railway.app", // ✅ Removed trailing slash
+      "http://localhost:3000",
     ],
     credentials: true,
-    exposedHeaders: ["set-cookie"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // ✅ Explicitly allowed methods
+    allowedHeaders: ["Content-Type", "Authorization"], // ✅ Allowed headers
   })
 );
-
-// ✅ Do NOT serve static frontend files (Vercel handles that)
-/// Removed: app.use(express.static(path.join(__dirname, "frontend")));
-
 
 // ✅ Routes
 app.use("/", routes, applicants, assessors, admins);
