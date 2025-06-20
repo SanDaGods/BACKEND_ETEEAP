@@ -19,7 +19,7 @@ router.get(
   applicantAuthMiddleware,
   applicantController.profileId
 );
-router.get("/auth-status", applicantAuthMiddleware, applicantController.authStatus);
+router.get("/api/auth-status", applicantController.authStatus);
 router.post("/applicant/logout", applicantController.logout);
 router.get(
   "/api/fetch-user-files/:userId",
