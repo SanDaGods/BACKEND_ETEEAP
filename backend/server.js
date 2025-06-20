@@ -37,9 +37,7 @@ app.use(
 );
 
 // ✅ Routes
-app.use("/api/applicants", applicants);   // Mount applicant routes under /api
-app.use("/api", assessors);   // Mount assessor routes under /api
-app.use("/api", admins);      // Mount admin routes under /api
+app.use("/", routes, applicants, assessors, admins);
 
 // ✅ Error handling middleware
 app.use((err, req, res, next) => {
