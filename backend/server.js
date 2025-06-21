@@ -41,7 +41,16 @@ app.use(
 app.options('*', cors());
 
 // ✅ Routes
-app.use("/", routes, applicants, assessors, admins);
+// ✅ Mount all routes with proper prefixes
+app.use("/api", routes); // Main routes
+app.use("/api/applicant", applicants); // Applicant routes
+app.use("/api/admin", admins); // Admin routes
+app.use("/api/assessor", assessors); // Assessor routes
+
+// Add a health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'healthy' });
+});
 
 // ✅ Error handling middleware
 // Add this before your routes
