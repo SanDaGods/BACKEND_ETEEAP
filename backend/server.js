@@ -37,7 +37,10 @@ app.use(
 );
 
 // ✅ Routes
-app.use("/", routes, applicants, assessors, admins);
+app.use("/api", require("./routes/authRoutes")); // Changed from "/api/auth"d
+app.use("/", require("./routes/applicantRoutes"));
+app.use("/api/admins", require("./routes/adminRoutes"));
+app.use("/api/assessors", require("./routes/assessorRoutes"));
 
 // ✅ Error handling middleware
 app.use((err, req, res, next) => {
