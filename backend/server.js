@@ -36,8 +36,13 @@ app.use(
   })
 );
 
+
+
 // ✅ Routes
-app.use("/", routes, applicants, assessors, admins);
+app.use("/api", routes); // Your base API routes
+app.use("/api/applicant", applicants); // All applicant routes
+app.use("/api/assessor", assessors); // All assessor routes
+app.use("/api/admin", admins); // All admin routes
 
 // ✅ Error handling middleware
 app.use((err, req, res, next) => {
