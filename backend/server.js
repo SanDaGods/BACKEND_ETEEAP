@@ -24,28 +24,48 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 
 // ✅ **FIXED CORS CONFIGURATION**
+// In server.js, update the CORS configuration:
 app.use(
   cors({
     origin: [
-      "https://frontendeteeap-production.up.railway.app", // ✅ Removed trailing slash
+      "https://frontendeteeap-production.up.railway.app",
       "http://localhost:3000",
     ],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // ✅ Explicitly allowed methods
-    allowedHeaders: ["Content-Type", "Authorization"], // ✅ Allowed headers
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
   })
 );
+
+// Add this before your routes to handle preflight requests
+app.options('*', cors());
 
 // ✅ Routes
 app.use("/", routes, applicants, assessors, admins);
 
 // ✅ Error handling middleware
+// Add this before your routes
+app.use((req, res, next) => {
+  console.log(`Incoming request: ${req.method} ${req.path}`);
+  next();
+});
+
+// Update your error handler
 app.use((err, req, res, next) => {
   console.error("Unhandled error:", err);
+  
+  // Handle JSON parse errors
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({
+      success: false,
+      error: "Invalid JSON payload"
+    });
+  }
+  
   res.status(500).json({
     success: false,
     error: "Internal server error",
-    details: process.env.NODE_ENV === "production" ? undefined : err.message,
+    details: process.env.NODE_ENV === "development" ? err.message : undefined,
   });
 });
 

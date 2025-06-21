@@ -131,13 +131,14 @@ exports.login = async (req, res) => {
       { expiresIn: "1h" }
     );
 
-    res.cookie("applicantToken", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 3600000,
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-      path: "/",
-    });
+res.cookie("applicantToken", token, {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === "production",
+  maxAge: 3600000, // 1 hour
+  sameSite: process.env.NODE_ENV === "production" ? "none" : "lax", // Changed to 'none' for cross-site
+  path: "/",
+  domain: process.env.NODE_ENV === "production" ? ".railway.app" : undefined
+});
 
     res.json({
       success: true,
