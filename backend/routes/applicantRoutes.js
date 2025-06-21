@@ -5,8 +5,8 @@ const { applicantAuthMiddleware } = require("../middleware/authMiddleware");
 const upload = require("../middleware/fileUpload");
 
 // Authentication Routes
-router.post("/api/register", applicantController.register);
-router.post("/api/login", applicantController.login);
+router.post("/register", applicantController.register);
+router.post("/login", applicantController.login);
 router.get("/api/auth-status", applicantController.authStatus);
 router.get("/applicant/auth-status", applicantController.authStatus); // Keep both for compatibility
 router.post("/applicant/logout", applicantController.logout);
