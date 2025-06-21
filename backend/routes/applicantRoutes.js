@@ -15,12 +15,12 @@ router.get("/api/fetch-documents/:id", applicantController.fileFetch);
 router.get("/api/delete-documents", applicantController.fileDelete);
 router.post("/api/update-personal-info", applicantController.updateInfo);
 router.get(
-  "/api/profile/:id",
+  "profile/:id",
   applicantAuthMiddleware,
   applicantController.profileId
 );
-router.get("/applicant/auth-status", applicantController.authStatus);
-router.post("/applicant/logout", applicantController.logout);
+router.get("/auth-status", applicantController.authStatus);
+router.post("/logout", applicantController.logout);
 router.get(
   "/api/fetch-user-files/:userId",
   applicantAuthMiddleware,
