@@ -39,7 +39,12 @@ app.use(
 
 
 // ✅ Routes
+// server.js - Update the routes section
+const authRoutes = require("./routes/authRoutes"); // Make sure this is imported
+
+// Mount routes like this:
 app.use("/api", routes); // Your base API routes
+app.use("/api/auth", authRoutes); // Authentication routes
 app.use("/api/applicant", applicants); // All applicant routes
 app.use("/api/assessor", assessors); // All assessor routes
 app.use("/api/admin", admins); // All admin routes

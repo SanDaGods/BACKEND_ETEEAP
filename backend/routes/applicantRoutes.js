@@ -4,37 +4,28 @@ const applicantController = require("../controllers/applicantController");
 const { applicantAuthMiddleware } = require("../middleware/authMiddleware");
 const upload = require("../middleware/fileUpload");
 
-router.post("/api/register", applicantController.register);
-router.post("/api/login", applicantController.login);
+// Applicant-specific routes (all prefixed with /api/applicant when mounted)
 router.post(
-  "/api/submit-documents",
+  "/submit-documents",
   upload.array("files"),
   applicantController.fileSubmit
 );
-router.get("/api/fetch-documents/:id", applicantController.fileFetch);
-router.get("/api/delete-documents", applicantController.fileDelete);
-router.post("/api/update-personal-info", applicantController.updateInfo);
+router.get("/fetch-documents/:id", applicantController.fileFetch);
+router.get("/delete-documents/:id", applicantController.fileDelete);
+router.post("/update-personal-info", applicantController.updateInfo);
 router.get(
-  "/api/profile/:id",
+  "/profile/:id",
   applicantAuthMiddleware,
   applicantController.profileId
 );
-router.get("/applicant/auth-status", applicantController.authStatus);
-router.post("/applicant/logout", applicantController.logout);
+router.get("/auth-status", applicantController.authStatus);
+router.post("/logout", applicantController.logout);
 router.get(
-  "/api/fetch-user-files/:userId",
+  "/fetch-user-files/:userId",
   applicantAuthMiddleware,
   applicantController.fetchUserFiles
 );
-
-router.delete("/api/delete-documents/:id", applicantController.fileDelete);
-
-router.post(
-  "/api/update-profile",
-  upload.single("profilePic"),
-  applicantController.updateProfile
-);
-
-router.get("/api/profile-pic/:userId", applicantController.getProfilePic);
+router.post("/update-profile", upload.single("file"), applicantController.updateProfile);
+router.get("/profile-pic/:userId", applicantController.getProfilePic);
 
 module.exports = router;
