@@ -1,14 +1,14 @@
-// authRoute.js
 const express = require("express");
 const router = express.Router();
 const authController = require("../controllers/authController");
 
-// POST /api/auth/register
+// POST /api/register
 router.post("/register", authController.register);
 
-// POST /api/auth/login
+// ADD THIS: POST /api/login
 router.post("/login", authController.login);
 
+// Optional: Ping test route
 router.get("/ping", (req, res) => {
   res.json({ success: true, message: "Ping successful" });
 });

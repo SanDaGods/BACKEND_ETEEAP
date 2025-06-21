@@ -23,35 +23,21 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// server.js
-const cors = require("cors");
-
-// ✅ Configure CORS properly
-const corsOptions = {
-  origin: [
-    "https://frontendeteeap-production.up.railway.app",
-    "http://localhost:3000",
-  ],
-  credentials: true, // Allow cookies/tokens
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Explicitly allow OPTIONS
-  allowedHeaders: ["Content-Type", "Authorization"],
-  optionsSuccessStatus: 200, // Legacy browsers choke on 204
-};
-
-app.use(cors(corsOptions)); // Apply globally
-
-
+// ✅ **FIXED CORS CONFIGURATION**
+app.use(
+  cors({
+    origin: [
+      "https://frontendeteeap-production.up.railway.app", // ✅ Removed trailing slash
+      "http://localhost:3000",
+    ],
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // ✅ Explicitly allowed methods
+    allowedHeaders: ["Content-Type", "Authorization"], // ✅ Allowed headers
+  })
+);
 
 // ✅ Routes
-// server.js - Update the routes section
-const authRoutes = require("./routes/authRoutes"); // Make sure this is imported
-
-// Mount routes like this:
-app.use("/api", routes); // Your base API routes
-app.use("/api/auth", authRoutes); // Authentication routes
-app.use("/api/applicant", applicants); // All applicant routes
-app.use("/api/assessor", assessors); // All assessor routes
-app.use("/api/admin", admins); // All admin routes
+app.use("/", routes, applicants, assessors, admins);
 
 // ✅ Error handling middleware
 app.use((err, req, res, next) => {
