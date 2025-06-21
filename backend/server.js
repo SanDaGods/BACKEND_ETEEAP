@@ -23,18 +23,22 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// ✅ **FIXED CORS CONFIGURATION**
-app.use(
-  cors({
-    origin: [
-      "https://frontendeteeap-production.up.railway.app", // ✅ Removed trailing slash
-      "http://localhost:3000",
-    ],
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // ✅ Explicitly allowed methods
-    allowedHeaders: ["Content-Type", "Authorization"], // ✅ Allowed headers
-  })
-);
+// server.js
+const cors = require("cors");
+
+// ✅ Configure CORS properly
+const corsOptions = {
+  origin: [
+    "https://frontendeteeap-production.up.railway.app",
+    "http://localhost:3000",
+  ],
+  credentials: true, // Allow cookies/tokens
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // Explicitly allow OPTIONS
+  allowedHeaders: ["Content-Type", "Authorization"],
+  optionsSuccessStatus: 200, // Legacy browsers choke on 204
+};
+
+app.use(cors(corsOptions)); // Apply globally
 
 
 
