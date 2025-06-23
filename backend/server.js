@@ -27,14 +27,19 @@ app.use(cookieParser());
 app.use(
   cors({
     origin: [
-      "https://frontendeteeap-production.up.railway.app", // ✅ Removed trailing slash
+      "https://frontendeteeap-production.up.railway.app",
       "http://localhost:3000",
+      "https://updated-backend-production-ff82.up.railway.app" // Add your backend domain too
     ],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // ✅ Explicitly allowed methods
-    allowedHeaders: ["Content-Type", "Authorization"], // ✅ Allowed headers
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    exposedHeaders: ["Content-Length", "Authorization"]
   })
 );
+
+// Add OPTIONS handler for preflight requests
+app.options('*', cors());
 
 // ✅ Routes
 app.use("/", routes, applicants, assessors, admins);
