@@ -105,8 +105,9 @@ exports.login = async (req, res) => {
   const { email, password } = req.body;
 
   try {
-    const admin = await Admin.findOne({
-      email: { $regex: new RegExp(`^${email}$`, "i") },
+    // Case-insensitive email search
+    const admin = await Admin.findOne({ 
+      email: { $regex: new RegExp(`^${email}$`, "i") } 
     });
 
     if (!admin) {
@@ -139,29 +140,34 @@ exports.login = async (req, res) => {
       { expiresIn: "8h" }
     );
 
+    // Enhanced cookie settings
     res.cookie("adminToken", token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      maxAge: 28800000,
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+      maxAge: 8 * 60 * 60 * 1000, // 8 hours
+      sameSite: "none", // Changed for cross-site usage
       path: "/",
+      domain: process.env.COOKIE_DOMAIN || undefined
     });
 
-    res.json({
+    // Consistent response format
+    res.status(200).json({
       success: true,
       message: "Login successful",
-      redirectTo: "/client/admin/dashboard/dashboard.html",
+      redirectTo: "/client/admin/dashboard/dashboard.html", // Consistent property name
       data: {
+        adminId: admin._id,
         email: admin.email,
         fullName: admin.fullName,
-        isSuperAdmin: admin.isSuperAdmin,
-      },
+        isSuperAdmin: admin.isSuperAdmin
+      }
     });
+
   } catch (error) {
     console.error("Admin login error:", error);
     res.status(500).json({
       success: false,
-      error: "Login failed",
+      error: "Internal server error",
     });
   }
 };

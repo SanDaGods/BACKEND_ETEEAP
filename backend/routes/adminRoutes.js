@@ -4,7 +4,7 @@ const adminController = require("../controllers/adminController");
 const { adminAuthMiddleware } = require("../middleware/authMiddleware");
 
 router.post("/admin/register", adminController.createAdmin);
-router.post("/admin/login", adminController.login);
+router.post("/admin/login", validateAdminLogin, adminController.login);
 router.get("/admin/auth-status", adminController.authstatus);
 router.post("/admin/logout", adminController.logout);
 router.get("/admin/dashboard", adminAuthMiddleware, adminController.dashboard);
