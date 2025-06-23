@@ -150,7 +150,7 @@ exports.login = async (req, res) => {
     res.json({
       success: true,
       message: "Login successful",
-      redirectTo: "/client/admin/dashboard/dashboard.html",
+      redirectTo: "/admin/dashboard/dashboard.html",
       data: {
         email: admin.email,
         fullName: admin.fullName,
