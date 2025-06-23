@@ -15,7 +15,7 @@ router.get("/api/fetch-documents/:id", applicantController.fileFetch);
 router.get("/api/delete-documents", applicantController.fileDelete);
 router.post("/api/update-personal-info", applicantController.updateInfo);
 router.get(
-  "profile/:id",
+  "/profile/:id",
   applicantAuthMiddleware,
   applicantController.profileId
 );
