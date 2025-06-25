@@ -4,12 +4,23 @@ const path = require("path");
 const fs = require("fs");
 const { JWT_SECRET } = require("../config/constants");
 const mongoose = require("mongoose");
+const conn = mongoose.connection;
+const multer = require("multer");
+const { GridFSBucket, ObjectId } = require("mongodb");
 
 const Admin = require("../models/Admin");
 const Applicant = require("../models/Applicant");
 const Assessor = require("../models/Assessor");
 const Evaluation = require("../models/Evaluation");
 const { getNextApplicantId, getNextAssessorId } = require("../utils/helpers");
+
+
+let gfs;
+conn.once("open", () => {
+  gfs = new GridFSBucket(conn.db, {
+    bucketName: "backupFiles",
+  });
+});
 
 exports.createAdmin = async (req, res) => {
   try {
@@ -1057,44 +1068,57 @@ exports.fetchApplicantFiles = async (req, res) => {
   try {
     const applicantId = req.params.id;
 
-    // Validate applicant ID
-    if (!mongoose.Types.ObjectId.isValid(applicantId)) {
-      return res.status(400).json({
+    // First find the applicant to get their files
+    const applicant = await mongoose.model('Applicant').findById(applicantId)
+      .select('files')
+      .lean();
+
+    if (!applicant) {
+      return res.status(404).json({ 
         success: false,
-        error: "Invalid applicant ID format"
+        error: 'Applicant not found' 
       });
     }
 
-    // First verify the applicant exists
-    const applicantExists = await Applicant.exists({ _id: applicantId });
-    if (!applicantExists) {
-      return res.status(404).json({
-        success: false,
-        error: "Applicant not found"
+    // If applicant has no files
+    if (!applicant.files || Object.keys(applicant.files).length === 0) {
+      return res.status(200).json({
+        success: true,
+        files: {}
       });
     }
 
-    // Find all files belonging to this applicant
-    const files = await conn.db.collection("backupFiles.files")
-      .find({ "metadata.owner": applicantId })
-      .sort({ uploadDate: -1 }) // Sort by newest first
-      .toArray();
+    // Get all file references from GridFS
+    const filePromises = [];
+    Object.entries(applicant.files).forEach(([category, fileRefs]) => {
+      fileRefs.forEach(fileRef => {
+        filePromises.push(
+          conn.db.collection('backupFiles').findOne({ _id: fileRef.fileId })
+            .then(file => {
+              if (file) {
+                return {
+                  ...file,
+                  label: category,
+                  _id: file._id.toString(),
+                  uploadDate: file.uploadDate.toISOString()
+                };
+              }
+              return null;
+            })
+        );
+      });
+    });
 
-    // Group files by label/category
+    const files = await Promise.all(filePromises);
+    const filteredFiles = files.filter(file => file !== null);
+
+    // Group files by category
     const groupedFiles = {};
-    files.forEach(file => {
-      const label = file.metadata?.label || "others";
-      if (!groupedFiles[label]) {
-        groupedFiles[label] = [];
+    filteredFiles.forEach(file => {
+      if (!groupedFiles[file.label]) {
+        groupedFiles[file.label] = [];
       }
-      groupedFiles[label].push({
-        _id: file._id,
-        filename: file.filename,
-        contentType: file.contentType,
-        uploadDate: file.uploadDate,
-        size: file.length,
-        label: label
-      });
+      groupedFiles[file.label].push(file);
     });
 
     res.status(200).json({
@@ -1103,84 +1127,81 @@ exports.fetchApplicantFiles = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Error fetching applicant files:", error);
+    console.error('Error fetching applicant files:', error);
     res.status(500).json({
       success: false,
-      error: "Internal server error while fetching files",
-      details: process.env.NODE_ENV === "development" ? error.message : undefined
+      error: 'Failed to fetch applicant files'
     });
   }
 };
 
-exports.viewApplicantFile = async (req, res) => {
+exports.fetchApplicantFiles = async (req, res) => {
   try {
-    const fileId = new mongoose.Types.ObjectId(req.params.id);
+    const applicantId = req.params.id;
 
-    // Verify the file exists
-    const file = await conn.db.collection("backupFiles.files").findOne({
-      _id: fileId,
-    });
+    // First find the applicant to get their files
+    const applicant = await mongoose.model('Applicant').findById(applicantId)
+      .select('files')
+      .lean();
 
-    if (!file) {
-      return res.status(404).json({ error: "File not found" });
-    }
-
-    const downloadStream = gfs.openDownloadStream(fileId);
-
-    res.set("Content-Type", file.contentType);
-    res.set("Content-Disposition", `inline; filename="${file.filename}"`);
-
-    downloadStream.pipe(res);
-
-    downloadStream.on("error", (error) => {
-      console.error("Error streaming file:", error);
-      res.status(500).json({ error: "Error streaming file" });
-    });
-  } catch (error) {
-    console.error("Error serving file:", error);
-    res.status(500).json({ error: "Failed to serve file" });
-  }
-};
-
-// adminController.js
-exports.viewApplicantFile = async (req, res) => {
-  try {
-    const fileId = new mongoose.Types.ObjectId(req.params.id);
-
-    // Verify the file belongs to an applicant the admin has access to
-    const applicantWithFile = await Applicant.findOne({
-      'files._id': fileId
-    }).select('_id');
-
-    if (!applicantWithFile) {
-      return res.status(404).json({
+    if (!applicant) {
+      return res.status(404).json({ 
         success: false,
-        error: "File not found or not accessible",
+        error: 'Applicant not found' 
       });
     }
 
-    // Use the existing file serving logic from applicantController
-    const file = await conn.db.collection("backupFiles.files").findOne({
-      _id: fileId,
-    });
-
-    if (!file) {
-      return res.status(404).json({ error: "File not found" });
+    // If applicant has no files
+    if (!applicant.files || Object.keys(applicant.files).length === 0) {
+      return res.status(200).json({
+        success: true,
+        files: {}
+      });
     }
 
-    const downloadStream = gfs.openDownloadStream(fileId);
-
-    res.set("Content-Type", file.contentType);
-    res.set("Content-Disposition", `inline; filename="${file.filename}"`);
-
-    downloadStream.pipe(res);
-
-    downloadStream.on("error", (error) => {
-      console.error("Error streaming file:", error);
-      res.status(500).json({ error: "Error streaming file" });
+    // Get all file references from GridFS
+    const filePromises = [];
+    Object.entries(applicant.files).forEach(([category, fileRefs]) => {
+      fileRefs.forEach(fileRef => {
+        filePromises.push(
+          conn.db.collection('backupFiles').findOne({ _id: fileRef.fileId })
+            .then(file => {
+              if (file) {
+                return {
+                  ...file,
+                  label: category,
+                  _id: file._id.toString(),
+                  uploadDate: file.uploadDate.toISOString()
+                };
+              }
+              return null;
+            })
+        );
+      });
     });
+
+    const files = await Promise.all(filePromises);
+    const filteredFiles = files.filter(file => file !== null);
+
+    // Group files by category
+    const groupedFiles = {};
+    filteredFiles.forEach(file => {
+      if (!groupedFiles[file.label]) {
+        groupedFiles[file.label] = [];
+      }
+      groupedFiles[file.label].push(file);
+    });
+
+    res.status(200).json({
+      success: true,
+      files: groupedFiles
+    });
+
   } catch (error) {
-    console.error("Error serving file:", error);
-    res.status(500).json({ error: "Failed to serve file" });
+    console.error('Error fetching applicant files:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch applicant files'
+    });
   }
 };
