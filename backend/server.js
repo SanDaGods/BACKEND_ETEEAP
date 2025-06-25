@@ -29,7 +29,8 @@ app.use(
     origin: [
       "https://frontendeteeap-production.up.railway.app",
       "http://localhost:3000",
-      "https://updated-backend-production-ff82.up.railway.app" // Add your backend domain too
+      "https://updated-backend-production-ff82.up.railway.app",
+      "https://backendeteeap-production.up.railway.app"// Add your backend domain too
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
