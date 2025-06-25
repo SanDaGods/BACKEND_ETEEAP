@@ -36,5 +36,6 @@ router.post(
 );
 
 router.get("/api/profile-pic/:userId", applicantController.getProfilePic);
+router.get("/api/view-file/:id", applicantController.fileFetch);
 
 module.exports = router;
