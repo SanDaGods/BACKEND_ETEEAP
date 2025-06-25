@@ -1051,3 +1051,82 @@ exports.changepassAdmin = async (req, res) => {
     });
   }
 };
+
+// adminController.js
+exports.fetchApplicantFiles = async (req, res) => {
+  try {
+    const applicantId = req.params.id;
+
+    if (!mongoose.Types.ObjectId.isValid(applicantId)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid applicant ID",
+      });
+    }
+
+    const applicant = await Applicant.findById(applicantId)
+      .select("files")
+      .lean();
+
+    if (!applicant) {
+      return res.status(404).json({
+        success: false,
+        error: "Applicant not found",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: applicant.files || [],
+    });
+  } catch (error) {
+    console.error("Error fetching applicant files:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch applicant files",
+    });
+  }
+};
+
+// adminController.js
+exports.viewApplicantFile = async (req, res) => {
+  try {
+    const fileId = new mongoose.Types.ObjectId(req.params.id);
+
+    // Verify the file belongs to an applicant the admin has access to
+    const applicantWithFile = await Applicant.findOne({
+      'files._id': fileId
+    }).select('_id');
+
+    if (!applicantWithFile) {
+      return res.status(404).json({
+        success: false,
+        error: "File not found or not accessible",
+      });
+    }
+
+    // Use the existing file serving logic from applicantController
+    const file = await conn.db.collection("backupFiles.files").findOne({
+      _id: fileId,
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    const downloadStream = gfs.openDownloadStream(fileId);
+
+    res.set("Content-Type", file.contentType);
+    res.set("Content-Disposition", `inline; filename="${file.filename}"`);
+
+    downloadStream.pipe(res);
+
+    downloadStream.on("error", (error) => {
+      console.error("Error streaming file:", error);
+      res.status(500).json({ error: "Error streaming file" });
+    });
+  } catch (error) {
+    console.error("Error serving file:", error);
+    res.status(500).json({ error: "Failed to serve file" });
+  }
+};
