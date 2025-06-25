@@ -1,24 +1,31 @@
-const bcrypt = require("bcryptjs");
-const jwt = require("jsonwebtoken");
-const path = require("path");
-const fs = require("fs");
-const { JWT_SECRET } = require("../config/constants");
-const mongoose = require("mongoose");
+// Core modules
+const path = require('path');
+const fs = require('fs');
+
+// NPM packages
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
+const multer = require('multer');
+const { GridFSBucket, ObjectId } = require('mongodb');
+
+// Local modules
+const { JWT_SECRET } = require('../config/constants');
+const { getNextApplicantId, getNextAssessorId } = require('../utils/helpers');
+
+// Models
+const Admin = require('../models/Admin');
+const Applicant = require('../models/Applicant');
+const Assessor = require('../models/Assessor');
+const Evaluation = require('../models/Evaluation');
+
+// Database connection and GridFS setup
 const conn = mongoose.connection;
-const multer = require("multer");
-const { GridFSBucket, ObjectId } = require("mongodb");
-
-const Admin = require("../models/Admin");
-const Applicant = require("../models/Applicant");
-const Assessor = require("../models/Assessor");
-const Evaluation = require("../models/Evaluation");
-const { getNextApplicantId, getNextAssessorId } = require("../utils/helpers");
-
-
 let gfs;
-conn.once("open", () => {
+
+conn.once('open', () => {
   gfs = new GridFSBucket(conn.db, {
-    bucketName: "backupFiles",
+    bucketName: 'backupFiles' // Consider using consistent bucket name ('uploads' or 'backupFiles')
   });
 });
 
@@ -1139,8 +1146,16 @@ exports.fetchApplicantFiles = async (req, res) => {
   try {
     const applicantId = req.params.id;
 
-    // First find the applicant to get their files
-    const applicant = await mongoose.model('Applicant').findById(applicantId)
+    // Validate applicant ID
+    if (!mongoose.Types.ObjectId.isValid(applicantId)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Invalid applicant ID'
+      });
+    }
+
+    // Find applicant with their files
+    const applicant = await Applicant.findById(applicantId)
       .select('files')
       .lean();
 
@@ -1151,57 +1166,109 @@ exports.fetchApplicantFiles = async (req, res) => {
       });
     }
 
-    // If applicant has no files
+    // If no files exist
     if (!applicant.files || Object.keys(applicant.files).length === 0) {
       return res.status(200).json({
         success: true,
-        files: {}
+        files: []
       });
     }
 
     // Get all file references from GridFS
     const filePromises = [];
     Object.entries(applicant.files).forEach(([category, fileRefs]) => {
-      fileRefs.forEach(fileRef => {
-        filePromises.push(
-          conn.db.collection('backupFiles').findOne({ _id: fileRef.fileId })
-            .then(file => {
-              if (file) {
-                return {
-                  ...file,
-                  label: category,
-                  _id: file._id.toString(),
-                  uploadDate: file.uploadDate.toISOString()
-                };
-              }
-              return null;
-            })
-        );
-      });
+      if (Array.isArray(fileRefs)) {
+        fileRefs.forEach(fileRef => {
+          if (fileRef && fileRef.fileId) {
+            filePromises.push(
+              conn.db.collection('uploads.files').findOne({ 
+                _id: new mongoose.Types.ObjectId(fileRef.fileId) 
+              })
+              .then(file => {
+                if (file) {
+                  return {
+                    ...file,
+                    label: category,
+                    _id: file._id.toString(),
+                    uploadDate: file.uploadDate.toISOString()
+                  };
+                }
+                return null;
+              })
+            );
+          }
+        });
+      }
     });
 
     const files = await Promise.all(filePromises);
     const filteredFiles = files.filter(file => file !== null);
 
-    // Group files by category
-    const groupedFiles = {};
-    filteredFiles.forEach(file => {
-      if (!groupedFiles[file.label]) {
-        groupedFiles[file.label] = [];
-      }
-      groupedFiles[file.label].push(file);
-    });
-
     res.status(200).json({
       success: true,
-      files: groupedFiles
+      files: filteredFiles
     });
 
   } catch (error) {
     console.error('Error fetching applicant files:', error);
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch applicant files'
+      error: 'Failed to fetch applicant files',
+      message: error.message
+    });
+  }
+};
+
+exports.viewApplicantFile = async (req, res) => {
+  try {
+    const fileId = req.params.id;
+
+    // Validate file ID
+    if (!mongoose.Types.ObjectId.isValid(fileId)) {
+      return res.status(400).json({ 
+        success: false,
+        error: "Invalid file ID" 
+      });
+    }
+
+    const objectId = new mongoose.Types.ObjectId(fileId);
+
+    // Verify the file exists
+    const file = await conn.db.collection('uploads.files').findOne({
+      _id: objectId
+    });
+
+    if (!file) {
+      return res.status(404).json({ 
+        success: false,
+        error: "File not found" 
+      });
+    }
+
+    // Set appropriate headers
+    res.set('Content-Type', file.contentType);
+    res.set('Content-Disposition', `inline; filename="${file.filename}"`);
+
+    // Stream the file
+    const downloadStream = gfs.openDownloadStream(objectId);
+    downloadStream.pipe(res);
+
+    downloadStream.on('error', (error) => {
+      console.error('Error streaming file:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ 
+          success: false,
+          error: 'Error streaming file' 
+        });
+      }
+    });
+
+  } catch (error) {
+    console.error('Error serving file:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to serve file',
+      message: error.message
     });
   }
 };
