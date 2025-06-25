@@ -1064,20 +1064,31 @@ exports.fetchApplicantFiles = async (req, res) => {
       });
     }
 
-    const applicant = await Applicant.findById(applicantId)
-      .select("files")
-      .lean();
+    // Find all files belonging to this applicant
+    const files = await conn.db.collection("backupFiles.files")
+      .find({ "metadata.owner": applicantId })
+      .toArray();
 
-    if (!applicant) {
-      return res.status(404).json({
-        success: false,
-        error: "Applicant not found",
+    // Group files by label/category
+    const groupedFiles = files.reduce((acc, file) => {
+      const label = file.metadata?.label || "others";
+      if (!acc[label]) {
+        acc[label] = [];
+      }
+      acc[label].push({
+        _id: file._id,
+        filename: file.filename,
+        contentType: file.contentType,
+        uploadDate: file.uploadDate,
+        size: file.length,
+        label: label,
       });
-    }
+      return acc;
+    }, {});
 
     res.status(200).json({
       success: true,
-      data: applicant.files || [],
+      files: groupedFiles,
     });
   } catch (error) {
     console.error("Error fetching applicant files:", error);
@@ -1085,6 +1096,36 @@ exports.fetchApplicantFiles = async (req, res) => {
       success: false,
       error: "Failed to fetch applicant files",
     });
+  }
+};
+
+exports.viewApplicantFile = async (req, res) => {
+  try {
+    const fileId = new mongoose.Types.ObjectId(req.params.id);
+
+    // Verify the file exists
+    const file = await conn.db.collection("backupFiles.files").findOne({
+      _id: fileId,
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    const downloadStream = gfs.openDownloadStream(fileId);
+
+    res.set("Content-Type", file.contentType);
+    res.set("Content-Disposition", `inline; filename="${file.filename}"`);
+
+    downloadStream.pipe(res);
+
+    downloadStream.on("error", (error) => {
+      console.error("Error streaming file:", error);
+      res.status(500).json({ error: "Error streaming file" });
+    });
+  } catch (error) {
+    console.error("Error serving file:", error);
+    res.status(500).json({ error: "Failed to serve file" });
   }
 };
 
