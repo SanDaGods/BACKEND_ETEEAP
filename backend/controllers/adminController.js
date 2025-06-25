@@ -1057,44 +1057,57 @@ exports.fetchApplicantFiles = async (req, res) => {
   try {
     const applicantId = req.params.id;
 
+    // Validate applicant ID
     if (!mongoose.Types.ObjectId.isValid(applicantId)) {
       return res.status(400).json({
         success: false,
-        error: "Invalid applicant ID",
+        error: "Invalid applicant ID format"
+      });
+    }
+
+    // First verify the applicant exists
+    const applicantExists = await Applicant.exists({ _id: applicantId });
+    if (!applicantExists) {
+      return res.status(404).json({
+        success: false,
+        error: "Applicant not found"
       });
     }
 
     // Find all files belonging to this applicant
     const files = await conn.db.collection("backupFiles.files")
       .find({ "metadata.owner": applicantId })
+      .sort({ uploadDate: -1 }) // Sort by newest first
       .toArray();
 
     // Group files by label/category
-    const groupedFiles = files.reduce((acc, file) => {
+    const groupedFiles = {};
+    files.forEach(file => {
       const label = file.metadata?.label || "others";
-      if (!acc[label]) {
-        acc[label] = [];
+      if (!groupedFiles[label]) {
+        groupedFiles[label] = [];
       }
-      acc[label].push({
+      groupedFiles[label].push({
         _id: file._id,
         filename: file.filename,
         contentType: file.contentType,
         uploadDate: file.uploadDate,
         size: file.length,
-        label: label,
+        label: label
       });
-      return acc;
-    }, {});
+    });
 
     res.status(200).json({
       success: true,
-      files: groupedFiles,
+      files: groupedFiles
     });
+
   } catch (error) {
     console.error("Error fetching applicant files:", error);
     res.status(500).json({
       success: false,
-      error: "Failed to fetch applicant files",
+      error: "Internal server error while fetching files",
+      details: process.env.NODE_ENV === "development" ? error.message : undefined
     });
   }
 };

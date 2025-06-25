@@ -55,6 +55,23 @@ app.use((err, req, res, next) => {
   });
 });
 
+// Add this before your routes
+app.use((req, res, next) => {
+  console.log(`Incoming request: ${req.method} ${req.path}`);
+  next();
+});
+
+// Add this after your routes
+app.use((err, req, res, next) => {
+  console.error('Unhandled error:', err);
+  res.status(500).json({
+    success: false,
+    error: 'Internal Server Error',
+    message: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
+
 // ✅ Start the server
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
