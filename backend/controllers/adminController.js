@@ -11,6 +11,13 @@ const Assessor = require("../models/Assessor");
 const Evaluation = require("../models/Evaluation");
 const { getNextApplicantId, getNextAssessorId } = require("../utils/helpers");
 
+mongoose.connection.once('open', () => {
+  gfs = new GridFSBucket(mongoose.connection.db, {
+    bucketName: "backupFiles" // Must match your upload bucket name
+  });
+  console.log('GridFSBucket initialized');
+});
+
 exports.createAdmin = async (req, res) => {
   try {
     const { email, password, fullName } = req.body;
@@ -1053,57 +1060,44 @@ exports.changepassAdmin = async (req, res) => {
 };
 
 // Fetch applicant's files
-exports.fetchApplicantFiles = async (req, res) => {
+exports.fetchApplicantFile = async (req, res) => {
   try {
-    const { applicantId } = req.params;
-
-    // Add validation
-    if (!mongoose.Types.ObjectId.isValid(applicantId)) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid applicant ID format"
-      });
+    // 1. Validate file ID
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: "Invalid file ID" });
     }
 
-    console.log(`Fetching files for applicant: ${applicantId}`); // Debug log
+    // 2. Check if bucket exists
+    if (!gfs) {
+      throw new Error('GridFS not initialized');
+    }
 
-    const files = await conn.db
-      .collection("backupFiles.files")
-      .find({
-        "metadata.owner": new mongoose.Types.ObjectId(applicantId) // Ensure proper ObjectId conversion
-      })
-      .toArray();
-
-    console.log(`Found ${files.length} files`); // Debug log
-
-    const groupedFiles = files.reduce((acc, file) => {
-      const label = file.metadata?.label || "others";
-      if (!acc[label]) {
-        acc[label] = [];
-      }
-      acc[label].push({
-        _id: file._id,
-        filename: file.filename,
-        contentType: file.contentType,
-        uploadDate: file.uploadDate,
-        size: file.length,
-        label: label
-      });
-      return acc;
-    }, {});
-
-    res.json({
-      success: true,
-      files: groupedFiles
+    // 3. Find the file metadata
+    const file = await mongoose.connection.db.collection('backupFiles.files').findOne({ 
+      _id: new mongoose.Types.ObjectId(req.params.id) 
     });
 
-  } catch (error) {
-    console.error("Error in fetchApplicantFiles:", error);
-    res.status(500).json({
-      success: false,
-      error: "Internal server error",
-      details: error.message
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    // 4. Stream the file
+    const downloadStream = gfs.openDownloadStream(file._id);
+    
+    // Set proper headers
+    res.set('Content-Type', file.contentType);
+    res.set('Content-Disposition', `inline; filename="${file.filename}"`);
+
+    downloadStream.pipe(res);
+
+    downloadStream.on('error', (err) => {
+      console.error('Stream error:', err);
+      res.status(500).end();
     });
+
+  } catch (err) {
+    console.error('File fetch error:', err);
+    res.status(500).json({ error: "Failed to fetch file" });
   }
 };
 
