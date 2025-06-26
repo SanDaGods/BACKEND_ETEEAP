@@ -4,12 +4,23 @@ const path = require("path");
 const fs = require("fs");
 const { JWT_SECRET } = require("../config/constants");
 const mongoose = require("mongoose");
+const { GridFSBucket, ObjectId } = require("mongodb");
+const conn = mongoose.connection;
 
 const Admin = require("../models/Admin");
 const Applicant = require("../models/Applicant");
 const Assessor = require("../models/Assessor");
 const Evaluation = require("../models/Evaluation");
 const { getNextApplicantId, getNextAssessorId } = require("../utils/helpers");
+
+
+let gfs;
+conn.once("open", () => {
+  gfs = new GridFSBucket(conn.db, {
+    bucketName: "backupFiles", // Same bucket as applicants use
+  });
+});
+
 
 exports.createAdmin = async (req, res) => {
   try {
