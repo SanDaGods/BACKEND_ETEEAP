@@ -1084,61 +1084,26 @@ exports.fetchApplicantFiles = async (req, res) => {
       });
     }
 
-    // Find applicant with their files
-    const applicant = await Applicant.findById(applicantId)
-      .select('files')
-      .lean();
+    // Find all files in GridFS that belong to this applicant
+    const files = await conn.db.collection('backupFiles.files')
+      .find({
+        'metadata.owner': new mongoose.Types.ObjectId(applicantId)
+      })
+      .toArray();
 
-    if (!applicant) {
-      return res.status(404).json({ 
-        success: false,
-        error: 'Applicant not found' 
-      });
-    }
-
-    // If no files exist
-    if (!applicant.files || Object.keys(applicant.files).length === 0) {
-      return res.status(200).json({
-        success: true,
-        files: []
-      });
-    }
-
-    // Get all file references from GridFS
-    const filePromises = [];
-    Object.entries(applicant.files).forEach(([category, fileRefs]) => {
-      if (Array.isArray(fileRefs)) {
-        fileRefs.forEach(fileRef => {
-          if (fileRef && fileRef.fileId) {
-            filePromises.push(
-              conn.db.collection('backupFiles.files').findOne({ 
-                _id: new mongoose.Types.ObjectId(fileRef.fileId) 
-              })
-              .then(file => {
-                if (file) {
-                  return {
-                    ...file,
-                    label: category,
-                    _id: file._id.toString(),
-                    uploadDate: file.uploadDate.toISOString(),
-                    filename: file.filename,
-                    contentType: file.contentType
-                  };
-                }
-                return null;
-              })
-            );
-          }
-        });
-      }
-    });
-
-    const files = await Promise.all(filePromises);
-    const filteredFiles = files.filter(file => file !== null);
+    // Format the files for response
+    const formattedFiles = files.map(file => ({
+      _id: file._id.toString(),
+      filename: file.filename,
+      label: file.metadata?.label || 'others',
+      uploadDate: file.uploadDate,
+      contentType: file.contentType,
+      size: file.length
+    }));
 
     res.status(200).json({
       success: true,
-      files: filteredFiles
+      files: formattedFiles
     });
 
   } catch (error) {
@@ -1165,7 +1130,7 @@ exports.viewApplicantFile = async (req, res) => {
 
     const objectId = new mongoose.Types.ObjectId(fileId);
 
-    // Verify the file exists in the correct bucket
+    // Verify the file exists and belongs to an applicant
     const file = await conn.db.collection('backupFiles.files').findOne({
       _id: objectId
     });
@@ -1181,12 +1146,11 @@ exports.viewApplicantFile = async (req, res) => {
     res.set('Content-Type', file.contentType);
     res.set('Content-Disposition', `inline; filename="${file.filename}"`);
 
-    // Create GridFS bucket with correct name
+    // Stream the file
     const gfs = new GridFSBucket(conn.db, {
       bucketName: 'backupFiles'
     });
-
-    // Stream the file
+    
     const downloadStream = gfs.openDownloadStream(objectId);
     downloadStream.pipe(res);
 
