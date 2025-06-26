@@ -1067,7 +1067,7 @@ exports.getApplicantFiles = async (req, res) => {
     // Fetch files from GridFS
     const files = await conn.db.collection("backupFiles.files")
       .find({
-        "metadata.owner": applicantId
+        "metadata.owner": new mongoose.Types.ObjectId(applicantId)
       })
       .toArray();
 
@@ -1082,7 +1082,7 @@ exports.getApplicantFiles = async (req, res) => {
         filename: file.filename,
         contentType: file.contentType,
         uploadDate: file.uploadDate,
-        size: file.metadata?.size,
+        size: file.length, // Using file.length instead of metadata.size
         label: label
       });
       return acc;
@@ -1119,9 +1119,6 @@ exports.getApplicantFile = async (req, res) => {
     if (!applicantId) {
       return res.status(403).json({ error: "Access denied" });
     }
-
-    // You might want to add additional checks here to verify
-    // the admin has permission to view this applicant's files
 
     const downloadStream = gfs.openDownloadStream(fileId);
 
