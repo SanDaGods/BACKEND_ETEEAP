@@ -104,4 +104,17 @@ router.put(
   adminController.changepassAdmin
 );
 
+// Add this route to fetch applicant files
+router.get('/applicants/:id/files', 
+  authMiddleware.adminAuth, 
+  adminController.getApplicantFiles
+);
+
+// Make sure you have this route for file fetching
+router.get('/applicant/files/:id', 
+  authMiddleware.adminAuth, 
+  adminController.getApplicantFile
+);
+
+
 module.exports = router;

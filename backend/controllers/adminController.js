@@ -1051,3 +1051,92 @@ exports.changepassAdmin = async (req, res) => {
     });
   }
 };
+
+// Add to adminController.js
+exports.getApplicantFiles = async (req, res) => {
+  try {
+    const applicantId = req.params.id;
+    
+    if (!mongoose.Types.ObjectId.isValid(applicantId)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid applicant ID format"
+      });
+    }
+
+    // Fetch files from GridFS
+    const files = await conn.db.collection("backupFiles.files")
+      .find({
+        "metadata.owner": applicantId
+      })
+      .toArray();
+
+    // Group files by label
+    const groupedFiles = files.reduce((acc, file) => {
+      const label = file.metadata?.label || "others";
+      if (!acc[label]) {
+        acc[label] = [];
+      }
+      acc[label].push({
+        _id: file._id,
+        filename: file.filename,
+        contentType: file.contentType,
+        uploadDate: file.uploadDate,
+        size: file.metadata?.size,
+        label: label
+      });
+      return acc;
+    }, {});
+
+    res.json({
+      success: true,
+      files: groupedFiles
+    });
+
+  } catch (error) {
+    console.error("Error fetching applicant files:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch applicant files"
+    });
+  }
+};
+
+exports.getApplicantFile = async (req, res) => {
+  try {
+    const fileId = new ObjectId(req.params.id);
+
+    const file = await conn.db.collection("backupFiles.files").findOne({
+      _id: fileId
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    // Verify the requesting admin has access to this file
+    const applicantId = file.metadata?.owner;
+    if (!applicantId) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+
+    // You might want to add additional checks here to verify
+    // the admin has permission to view this applicant's files
+
+    const downloadStream = gfs.openDownloadStream(fileId);
+
+    res.set("Content-Type", file.contentType);
+    res.set("Content-Disposition", `inline; filename="${file.filename}"`);
+
+    downloadStream.pipe(res);
+
+    downloadStream.on("error", (error) => {
+      console.error("Error streaming file:", error);
+      res.status(500).json({ error: "Error streaming file" });
+    });
+
+  } catch (error) {
+    console.error("Error serving file:", error);
+    res.status(500).json({ error: "Failed to serve file" });
+  }
+};
