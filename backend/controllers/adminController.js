@@ -4,7 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const { JWT_SECRET } = require("../config/constants");
 const mongoose = require("mongoose");
-const { MongoClient, GridFSBucket } = require('mongodb');
+const { MongoClient, GridFSBucket, ObjectId } = require('mongodb');
 
 const Admin = require("../models/Admin");
 const Applicant = require("../models/Applicant");
@@ -14,7 +14,7 @@ const { getNextApplicantId, getNextAssessorId } = require("../utils/helpers");
 
 mongoose.connection.once('open', () => {
   gfs = new GridFSBucket(mongoose.connection.db, {
-    bucketName: "backupFiles" // Must match your upload bucket name
+    bucketName: "backupFiles"
   });
   console.log('GridFSBucket initialized');
 });

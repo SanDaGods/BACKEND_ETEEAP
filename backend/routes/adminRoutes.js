@@ -111,10 +111,8 @@ router.get(
   adminController.fetchApplicantFiles
 );
 
-
-
 router.get(
-  "/api/admin/applicants/files/:id",
+  '/api/admin/applicants/files/:id',
   adminAuthMiddleware,
   adminController.fetchApplicantFile
 );
