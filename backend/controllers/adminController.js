@@ -1055,8 +1055,9 @@ exports.changepassAdmin = async (req, res) => {
 // Fetch applicant's files
 exports.fetchApplicantFiles = async (req, res) => {
   try {
-    const applicantId = req.params.applicantId;
-    
+    const { applicantId } = req.params;
+
+    // Add validation
     if (!mongoose.Types.ObjectId.isValid(applicantId)) {
       return res.status(400).json({
         success: false,
@@ -1064,12 +1065,16 @@ exports.fetchApplicantFiles = async (req, res) => {
       });
     }
 
+    console.log(`Fetching files for applicant: ${applicantId}`); // Debug log
+
     const files = await conn.db
       .collection("backupFiles.files")
       .find({
-        "metadata.owner": applicantId
+        "metadata.owner": new mongoose.Types.ObjectId(applicantId) // Ensure proper ObjectId conversion
       })
       .toArray();
+
+    console.log(`Found ${files.length} files`); // Debug log
 
     const groupedFiles = files.reduce((acc, file) => {
       const label = file.metadata?.label || "others";
@@ -1081,7 +1086,7 @@ exports.fetchApplicantFiles = async (req, res) => {
         filename: file.filename,
         contentType: file.contentType,
         uploadDate: file.uploadDate,
-        size: file.metadata?.size,
+        size: file.length,
         label: label
       });
       return acc;
@@ -1091,11 +1096,12 @@ exports.fetchApplicantFiles = async (req, res) => {
       success: true,
       files: groupedFiles
     });
+
   } catch (error) {
-    console.error("Error fetching applicant files:", error);
+    console.error("Error in fetchApplicantFiles:", error);
     res.status(500).json({
       success: false,
-      error: "Failed to fetch files",
+      error: "Internal server error",
       details: error.message
     });
   }
