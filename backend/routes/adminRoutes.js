@@ -106,13 +106,13 @@ router.put(
 
 // Add this route to fetch applicant files
 router.get('/applicants/:id/files', 
-  authMiddleware.adminAuth, 
+  adminAuthMiddleware, // Use the imported middleware
   adminController.getApplicantFiles
 );
 
 // Make sure you have this route for file fetching
 router.get('/applicant/files/:id', 
-  authMiddleware.adminAuth, 
+  adminAuthMiddleware, // Use the imported middleware
   adminController.getApplicantFile
 );
 
