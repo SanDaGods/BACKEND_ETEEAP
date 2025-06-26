@@ -122,7 +122,6 @@ router.get('/applicants/:id/files',
   adminController.getApplicantFiles
 );
 
-// Route for fetching individual files
 router.get('/applicants/files/:id',
   adminAuthMiddleware,
   adminController.getApplicantFile

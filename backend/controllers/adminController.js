@@ -1064,14 +1064,26 @@ exports.getApplicantFiles = async (req, res) => {
       });
     }
 
-    // Fetch files from GridFS
-    const files = await conn.db.collection("backupFiles.files")
-      .find({
-        "metadata.owner": new mongoose.Types.ObjectId(applicantId)
-      })
-      .toArray();
+    // Convert to ObjectId for proper querying
+    const objectId = new mongoose.Types.ObjectId(applicantId);
 
-    // Group files by label
+    // Fetch files from GridFS with proper owner matching
+    const filesCursor = await conn.db.collection("backupFiles.files")
+      .find({
+        "metadata.owner": objectId
+      })
+      .sort({ "metadata.label": 1, "uploadDate": -1 });
+
+    const files = await filesCursor.toArray();
+
+    if (!files || files.length === 0) {
+      return res.json({
+        success: true,
+        files: {}
+      });
+    }
+
+    // Group files by label with proper structure
     const groupedFiles = files.reduce((acc, file) => {
       const label = file.metadata?.label || "others";
       if (!acc[label]) {
@@ -1082,7 +1094,7 @@ exports.getApplicantFiles = async (req, res) => {
         filename: file.filename,
         contentType: file.contentType,
         uploadDate: file.uploadDate,
-        size: file.length, // Using file.length instead of metadata.size
+        size: file.length, // Using file.length from GridFS
         label: label
       });
       return acc;
@@ -1097,31 +1109,40 @@ exports.getApplicantFiles = async (req, res) => {
     console.error("Error fetching applicant files:", error);
     res.status(500).json({
       success: false,
-      error: "Failed to fetch applicant files"
+      error: "Failed to fetch applicant files",
+      details: error.message
     });
   }
 };
 
 exports.getApplicantFile = async (req, res) => {
   try {
-    const fileId = new ObjectId(req.params.id);
+    const fileId = new mongoose.Types.ObjectId(req.params.id);
 
+    // Verify file exists and belongs to an applicant
     const file = await conn.db.collection("backupFiles.files").findOne({
       _id: fileId
     });
 
     if (!file) {
-      return res.status(404).json({ error: "File not found" });
+      return res.status(404).json({ 
+        success: false,
+        error: "File not found" 
+      });
     }
 
-    // Verify the requesting admin has access to this file
-    const applicantId = file.metadata?.owner;
-    if (!applicantId) {
-      return res.status(403).json({ error: "Access denied" });
+    // Verify the file belongs to an applicant (optional security check)
+    if (!file.metadata?.owner) {
+      return res.status(403).json({ 
+        success: false,
+        error: "Access denied" 
+      });
     }
 
+    // Stream the file from GridFS
     const downloadStream = gfs.openDownloadStream(fileId);
 
+    // Set proper headers
     res.set("Content-Type", file.contentType);
     res.set("Content-Disposition", `inline; filename="${file.filename}"`);
 
@@ -1129,11 +1150,20 @@ exports.getApplicantFile = async (req, res) => {
 
     downloadStream.on("error", (error) => {
       console.error("Error streaming file:", error);
-      res.status(500).json({ error: "Error streaming file" });
+      if (!res.headersSent) {
+        res.status(500).json({ 
+          success: false,
+          error: "Error streaming file" 
+        });
+      }
     });
 
   } catch (error) {
     console.error("Error serving file:", error);
-    res.status(500).json({ error: "Failed to serve file" });
+    res.status(500).json({ 
+      success: false,
+      error: "Failed to serve file",
+      details: error.message
+    });
   }
 };
