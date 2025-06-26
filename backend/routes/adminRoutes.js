@@ -104,17 +104,4 @@ router.put(
   adminController.changepassAdmin
 );
 
-router.get(
-  '/api/admin/applicants/:id/files',
-  adminAuthMiddleware,
-  adminController.fetchApplicantFiles
-);
-
-router.get(
-  '/api/admin/view-file/:id',
-  adminAuthMiddleware,
-  adminController.viewApplicantFile
-);
-
-
 module.exports = router;

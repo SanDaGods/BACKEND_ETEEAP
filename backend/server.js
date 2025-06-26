@@ -72,6 +72,16 @@ app.use((err, req, res, next) => {
   });
 });
 
+app.get('/health', (req, res) => {
+  mongoose.connection.db.admin().ping((err) => {
+    if (err) return res.status(503).json({ db: 'disconnected' });
+    res.json({ 
+      db: 'connected',
+      gridfs: gfs ? 'ready' : 'not initialized'
+    });
+  });
+});
+
 // ✅ Start the server
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);

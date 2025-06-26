@@ -1,33 +1,15 @@
-// Core modules
-const path = require('path');
-const fs = require('fs');
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const path = require("path");
+const fs = require("fs");
+const { JWT_SECRET } = require("../config/constants");
+const mongoose = require("mongoose");
 
-// NPM packages
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const mongoose = require('mongoose');
-const multer = require('multer');
-const { GridFSBucket, ObjectId } = require('mongodb');
-
-// Local modules
-const { JWT_SECRET } = require('../config/constants');
-const { getNextApplicantId, getNextAssessorId } = require('../utils/helpers');
-
-// Models
-const Admin = require('../models/Admin');
-const Applicant = require('../models/Applicant');
-const Assessor = require('../models/Assessor');
-const Evaluation = require('../models/Evaluation');
-
-// Database connection and GridFS setup
-const conn = mongoose.connection;
-let gfs;
-
-conn.once('open', () => {
-  gfs = new GridFSBucket(conn.db, {
-    bucketName: 'backupFiles' // Use consistent name here
-  });
-});
+const Admin = require("../models/Admin");
+const Applicant = require("../models/Applicant");
+const Assessor = require("../models/Assessor");
+const Evaluation = require("../models/Evaluation");
+const { getNextApplicantId, getNextAssessorId } = require("../utils/helpers");
 
 exports.createAdmin = async (req, res) => {
   try {
@@ -1066,110 +1048,6 @@ exports.changepassAdmin = async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to change password",
-    });
-  }
-};
-
-// adminController.js
-// Remove the duplicate fetchApplicantFiles function and keep this one:
-exports.fetchApplicantFiles = async (req, res) => {
-  try {
-    const applicantId = req.params.id;
-
-    // Validate applicant ID
-    if (!mongoose.Types.ObjectId.isValid(applicantId)) {
-      return res.status(400).json({
-        success: false,
-        error: 'Invalid applicant ID'
-      });
-    }
-
-    // Find all files in GridFS that belong to this applicant
-    const files = await conn.db.collection('backupFiles.files')
-      .find({
-        'metadata.owner': new mongoose.Types.ObjectId(applicantId)
-      })
-      .toArray();
-
-    // Format the files for response
-    const formattedFiles = files.map(file => ({
-      _id: file._id.toString(),
-      filename: file.filename,
-      label: file.metadata?.label || 'others',
-      uploadDate: file.uploadDate,
-      contentType: file.contentType,
-      size: file.length
-    }));
-
-    res.status(200).json({
-      success: true,
-      files: formattedFiles
-    });
-
-  } catch (error) {
-    console.error('Error fetching applicant files:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch applicant files',
-      message: error.message
-    });
-  }
-};
-
-exports.viewApplicantFile = async (req, res) => {
-  try {
-    const fileId = req.params.id;
-
-    // Validate file ID
-    if (!mongoose.Types.ObjectId.isValid(fileId)) {
-      return res.status(400).json({ 
-        success: false,
-        error: "Invalid file ID" 
-      });
-    }
-
-    const objectId = new mongoose.Types.ObjectId(fileId);
-
-    // Verify the file exists and belongs to an applicant
-    const file = await conn.db.collection('backupFiles.files').findOne({
-      _id: objectId
-    });
-
-    if (!file) {
-      return res.status(404).json({ 
-        success: false,
-        error: "File not found" 
-      });
-    }
-
-    // Set appropriate headers
-    res.set('Content-Type', file.contentType);
-    res.set('Content-Disposition', `inline; filename="${file.filename}"`);
-
-    // Stream the file
-    const gfs = new GridFSBucket(conn.db, {
-      bucketName: 'backupFiles'
-    });
-    
-    const downloadStream = gfs.openDownloadStream(objectId);
-    downloadStream.pipe(res);
-
-    downloadStream.on('error', (error) => {
-      console.error('Error streaming file:', error);
-      if (!res.headersSent) {
-        res.status(500).json({ 
-          success: false,
-          error: 'Error streaming file' 
-        });
-      }
-    });
-
-  } catch (error) {
-    console.error('Error serving file:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to serve file',
-      message: error.message
     });
   }
 };
