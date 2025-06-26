@@ -1051,3 +1051,82 @@ exports.changepassAdmin = async (req, res) => {
     });
   }
 };
+
+// Fetch applicant's files
+exports.fetchApplicantFiles = async (req, res) => {
+  try {
+    const applicantId = req.params.applicantId;
+    
+    if (!mongoose.Types.ObjectId.isValid(applicantId)) {
+      return res.status(400).json({
+        success: false,
+        error: "Invalid applicant ID format"
+      });
+    }
+
+    const files = await conn.db
+      .collection("backupFiles.files")
+      .find({
+        "metadata.owner": applicantId
+      })
+      .toArray();
+
+    const groupedFiles = files.reduce((acc, file) => {
+      const label = file.metadata?.label || "others";
+      if (!acc[label]) {
+        acc[label] = [];
+      }
+      acc[label].push({
+        _id: file._id,
+        filename: file.filename,
+        contentType: file.contentType,
+        uploadDate: file.uploadDate,
+        size: file.metadata?.size,
+        label: label
+      });
+      return acc;
+    }, {});
+
+    res.json({
+      success: true,
+      files: groupedFiles
+    });
+  } catch (error) {
+    console.error("Error fetching applicant files:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch files",
+      details: error.message
+    });
+  }
+};
+
+// Fetch a single file
+exports.fetchApplicantFile = async (req, res) => {
+  try {
+    const fileId = new ObjectId(req.params.id);
+
+    const file = await conn.db.collection("backupFiles.files").findOne({
+      _id: fileId
+    });
+
+    if (!file) {
+      return res.status(404).json({ error: "File not found" });
+    }
+
+    const downloadStream = gfs.openDownloadStream(fileId);
+
+    res.set("Content-Type", file.contentType);
+    res.set("Content-Disposition", `inline; filename="${file.filename}"`);
+
+    downloadStream.pipe(res);
+
+    downloadStream.on("error", (error) => {
+      console.error("Error streaming file:", error);
+      res.status(500).json({ error: "Error streaming file" });
+    });
+  } catch (error) {
+    console.error("Error serving file:", error);
+    res.status(500).json({ error: "Failed to serve file" });
+  }
+};
