@@ -1056,58 +1056,55 @@ exports.fetchApplicantFiles = async (req, res) => {
   try {
     const applicantId = req.params.applicantId;
     
-    console.log(`Fetching files for applicant: ${applicantId}`); // Debug log
+    console.log(`Fetching files for applicant: ${applicantId}`);
     
     if (!applicantId || !mongoose.Types.ObjectId.isValid(applicantId)) {
-      console.error('Invalid applicant ID format:', applicantId);
       return res.status(400).json({
         success: false,
         error: "Invalid applicant ID format",
       });
     }
 
+    // Convert to ObjectId
+    const objectId = new mongoose.Types.ObjectId(applicantId);
+
     const files = await conn.db
       .collection("backupFiles.files")
       .find({
-        "metadata.owner": new mongoose.Types.ObjectId(applicantId) // Ensure proper ObjectId conversion
+        "metadata.owner": objectId
       })
       .toArray();
 
-    console.log(`Found ${files.length} files for applicant ${applicantId}`); // Debug log
+    console.log(`Found ${files.length} files`);
 
+    // Group files by label
     const groupedFiles = {};
-    
     files.forEach(file => {
       const label = file.metadata?.label || "others";
       if (!groupedFiles[label]) {
         groupedFiles[label] = [];
       }
       groupedFiles[label].push({
-        _id: file._id,
+        _id: file._id.toString(), // Convert to string for frontend
         filename: file.filename,
         contentType: file.contentType,
         uploadDate: file.uploadDate,
-        size: file.metadata?.size,
-        label: label,
+        size: file.length,
+        label: label
       });
     });
 
-    console.log('Grouped files:', groupedFiles); // Debug log
-
     res.json({
       success: true,
-      files: groupedFiles,
+      files: groupedFiles
     });
+
   } catch (error) {
-    console.error("Error in fetchApplicantFiles:", {
-      error: error.message,
-      stack: error.stack,
-      params: req.params
-    });
+    console.error("Error fetching applicant files:", error);
     res.status(500).json({
       success: false,
       error: "Failed to fetch files",
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 };
