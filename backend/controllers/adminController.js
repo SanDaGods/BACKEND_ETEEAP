@@ -1076,13 +1076,6 @@ exports.getApplicantFiles = async (req, res) => {
 
     const files = await filesCursor.toArray();
 
-    if (!files || files.length === 0) {
-      return res.json({
-        success: true,
-        files: {}
-      });
-    }
-
     // Group files by label with proper structure
     const groupedFiles = files.reduce((acc, file) => {
       const label = file.metadata?.label || "others";
@@ -1094,7 +1087,7 @@ exports.getApplicantFiles = async (req, res) => {
         filename: file.filename,
         contentType: file.contentType,
         uploadDate: file.uploadDate,
-        size: file.length, // Using file.length from GridFS
+        size: file.length,
         label: label
       });
       return acc;
@@ -1119,7 +1112,6 @@ exports.getApplicantFile = async (req, res) => {
   try {
     const fileId = new mongoose.Types.ObjectId(req.params.id);
 
-    // Verify file exists and belongs to an applicant
     const file = await conn.db.collection("backupFiles.files").findOne({
       _id: fileId
     });
@@ -1128,14 +1120,6 @@ exports.getApplicantFile = async (req, res) => {
       return res.status(404).json({ 
         success: false,
         error: "File not found" 
-      });
-    }
-
-    // Verify the file belongs to an applicant (optional security check)
-    if (!file.metadata?.owner) {
-      return res.status(403).json({ 
-        success: false,
-        error: "Access denied" 
       });
     }
 

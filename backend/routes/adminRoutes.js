@@ -104,15 +104,16 @@ router.put(
   adminController.changepassAdmin
 );
 
-// Add this route to fetch applicant files
-router.get('/applicants/:id/files', 
-  adminAuthMiddleware, // Use the imported middleware
+// Add these routes with proper paths
+router.get(
+  '/api/admin/applicants/:id/files',
+  adminAuthMiddleware,
   adminController.getApplicantFiles
 );
 
-// Make sure you have this route for file fetching
-router.get('/applicant/files/:id', 
-  adminAuthMiddleware, // Use the imported middleware
+router.get(
+  '/api/admin/applicants/files/:id',
+  adminAuthMiddleware,
   adminController.getApplicantFile
 );
 
