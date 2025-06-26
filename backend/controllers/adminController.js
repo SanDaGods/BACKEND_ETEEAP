@@ -25,7 +25,7 @@ let gfs;
 
 conn.once('open', () => {
   gfs = new GridFSBucket(conn.db, {
-    bucketName: 'backupFiles' // Consider using consistent bucket name ('uploads' or 'backupFiles')
+    bucketName: 'backupFiles' // Use consistent name here
   });
 });
 
@@ -1071,77 +1071,7 @@ exports.changepassAdmin = async (req, res) => {
 };
 
 // adminController.js
-exports.fetchApplicantFiles = async (req, res) => {
-  try {
-    const applicantId = req.params.id;
-
-    // First find the applicant to get their files
-    const applicant = await mongoose.model('Applicant').findById(applicantId)
-      .select('files')
-      .lean();
-
-    if (!applicant) {
-      return res.status(404).json({ 
-        success: false,
-        error: 'Applicant not found' 
-      });
-    }
-
-    // If applicant has no files
-    if (!applicant.files || Object.keys(applicant.files).length === 0) {
-      return res.status(200).json({
-        success: true,
-        files: {}
-      });
-    }
-
-    // Get all file references from GridFS
-    const filePromises = [];
-    Object.entries(applicant.files).forEach(([category, fileRefs]) => {
-      fileRefs.forEach(fileRef => {
-        filePromises.push(
-          conn.db.collection('backupFiles').findOne({ _id: fileRef.fileId })
-            .then(file => {
-              if (file) {
-                return {
-                  ...file,
-                  label: category,
-                  _id: file._id.toString(),
-                  uploadDate: file.uploadDate.toISOString()
-                };
-              }
-              return null;
-            })
-        );
-      });
-    });
-
-    const files = await Promise.all(filePromises);
-    const filteredFiles = files.filter(file => file !== null);
-
-    // Group files by category
-    const groupedFiles = {};
-    filteredFiles.forEach(file => {
-      if (!groupedFiles[file.label]) {
-        groupedFiles[file.label] = [];
-      }
-      groupedFiles[file.label].push(file);
-    });
-
-    res.status(200).json({
-      success: true,
-      files: groupedFiles
-    });
-
-  } catch (error) {
-    console.error('Error fetching applicant files:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to fetch applicant files'
-    });
-  }
-};
-
+// Remove the duplicate fetchApplicantFiles function and keep this one:
 exports.fetchApplicantFiles = async (req, res) => {
   try {
     const applicantId = req.params.id;
@@ -1181,7 +1111,7 @@ exports.fetchApplicantFiles = async (req, res) => {
         fileRefs.forEach(fileRef => {
           if (fileRef && fileRef.fileId) {
             filePromises.push(
-              conn.db.collection('uploads.files').findOne({ 
+              conn.db.collection('backupFiles.files').findOne({ 
                 _id: new mongoose.Types.ObjectId(fileRef.fileId) 
               })
               .then(file => {
@@ -1190,7 +1120,9 @@ exports.fetchApplicantFiles = async (req, res) => {
                     ...file,
                     label: category,
                     _id: file._id.toString(),
-                    uploadDate: file.uploadDate.toISOString()
+                    uploadDate: file.uploadDate.toISOString(),
+                    filename: file.filename,
+                    contentType: file.contentType
                   };
                 }
                 return null;
@@ -1233,8 +1165,8 @@ exports.viewApplicantFile = async (req, res) => {
 
     const objectId = new mongoose.Types.ObjectId(fileId);
 
-    // Verify the file exists
-    const file = await conn.db.collection('uploads.files').findOne({
+    // Verify the file exists in the correct bucket
+    const file = await conn.db.collection('backupFiles.files').findOne({
       _id: objectId
     });
 
@@ -1248,6 +1180,11 @@ exports.viewApplicantFile = async (req, res) => {
     // Set appropriate headers
     res.set('Content-Type', file.contentType);
     res.set('Content-Disposition', `inline; filename="${file.filename}"`);
+
+    // Create GridFS bucket with correct name
+    const gfs = new GridFSBucket(conn.db, {
+      bucketName: 'backupFiles'
+    });
 
     // Stream the file
     const downloadStream = gfs.openDownloadStream(objectId);
