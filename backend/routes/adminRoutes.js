@@ -116,16 +116,4 @@ router.get('/applicant/files/:id',
   adminController.getApplicantFile
 );
 
-// Add this route to fetch applicant files
-router.get('/applicants/:id/files', 
-  adminAuthMiddleware,
-  adminController.getApplicantFiles
-);
-
-router.get('/applicants/files/:id',
-  adminAuthMiddleware,
-  adminController.getApplicantFile
-);
-
-
 module.exports = router;
