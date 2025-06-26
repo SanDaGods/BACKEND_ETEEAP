@@ -1056,8 +1056,6 @@ exports.fetchApplicantFiles = async (req, res) => {
   try {
     const applicantId = req.params.applicantId;
     
-    console.log(`Fetching files for applicant: ${applicantId}`);
-    
     if (!applicantId || !mongoose.Types.ObjectId.isValid(applicantId)) {
       return res.status(400).json({
         success: false,
@@ -1065,17 +1063,15 @@ exports.fetchApplicantFiles = async (req, res) => {
       });
     }
 
-    // Convert to ObjectId
+    // Convert to ObjectId for proper querying
     const objectId = new mongoose.Types.ObjectId(applicantId);
 
     const files = await conn.db
       .collection("backupFiles.files")
       .find({
-        "metadata.owner": objectId
+        "metadata.owner": applicantId // Changed to use string directly
       })
       .toArray();
-
-    console.log(`Found ${files.length} files`);
 
     // Group files by label
     const groupedFiles = {};
@@ -1111,33 +1107,27 @@ exports.fetchApplicantFiles = async (req, res) => {
 
 exports.fetchApplicantFile = async (req, res) => {
   try {
-    const fileId = new ObjectId(req.params.id);
+    const fileId = req.params.fileId;
+    const applicantId = req.params.applicantId;
+
+    if (!mongoose.Types.ObjectId.isValid(fileId) || !mongoose.Types.ObjectId.isValid(applicantId)) {
+      return res.status(400).json({ error: "Invalid ID format" });
+    }
 
     const file = await conn.db.collection("backupFiles.files").findOne({
-      _id: fileId,
+      _id: new mongoose.Types.ObjectId(fileId),
+      "metadata.owner": applicantId // Match both file ID and owner
     });
 
     if (!file) {
-      return res.status(404).json({ error: "File not found" });
+      return res.status(404).json({ error: "File not found or access denied" });
     }
 
-    // Verify the file belongs to the applicant
-    const applicantId = req.params.applicantId;
-    if (file.metadata.owner.toString() !== applicantId) {
-      return res.status(403).json({ error: "Access denied" });
-    }
-
-    const downloadStream = gfs.openDownloadStream(fileId);
-
+    const downloadStream = gfs.openDownloadStream(file._id);
     res.set("Content-Type", file.contentType);
     res.set("Content-Disposition", `inline; filename="${file.filename}"`);
-
     downloadStream.pipe(res);
 
-    downloadStream.on("error", (error) => {
-      console.error("Error streaming file:", error);
-      res.status(500).json({ error: "Error streaming file" });
-    });
   } catch (error) {
     console.error("Error serving file:", error);
     res.status(500).json({ error: "Failed to serve file" });
