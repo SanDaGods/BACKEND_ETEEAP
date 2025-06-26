@@ -1056,7 +1056,10 @@ exports.fetchApplicantFiles = async (req, res) => {
   try {
     const applicantId = req.params.applicantId;
     
+    console.log(`Fetching files for applicant: ${applicantId}`); // Debug log
+    
     if (!applicantId || !mongoose.Types.ObjectId.isValid(applicantId)) {
+      console.error('Invalid applicant ID format:', applicantId);
       return res.status(400).json({
         success: false,
         error: "Invalid applicant ID format",
@@ -1066,16 +1069,20 @@ exports.fetchApplicantFiles = async (req, res) => {
     const files = await conn.db
       .collection("backupFiles.files")
       .find({
-        "metadata.owner": applicantId,
+        "metadata.owner": new mongoose.Types.ObjectId(applicantId) // Ensure proper ObjectId conversion
       })
       .toArray();
 
-    const groupedFiles = files.reduce((acc, file) => {
+    console.log(`Found ${files.length} files for applicant ${applicantId}`); // Debug log
+
+    const groupedFiles = {};
+    
+    files.forEach(file => {
       const label = file.metadata?.label || "others";
-      if (!acc[label]) {
-        acc[label] = [];
+      if (!groupedFiles[label]) {
+        groupedFiles[label] = [];
       }
-      acc[label].push({
+      groupedFiles[label].push({
         _id: file._id,
         filename: file.filename,
         contentType: file.contentType,
@@ -1083,19 +1090,24 @@ exports.fetchApplicantFiles = async (req, res) => {
         size: file.metadata?.size,
         label: label,
       });
-      return acc;
-    }, {});
+    });
+
+    console.log('Grouped files:', groupedFiles); // Debug log
 
     res.json({
       success: true,
       files: groupedFiles,
     });
   } catch (error) {
-    console.error("Error fetching applicant files:", error);
+    console.error("Error in fetchApplicantFiles:", {
+      error: error.message,
+      stack: error.stack,
+      params: req.params
+    });
     res.status(500).json({
       success: false,
       error: "Failed to fetch files",
-      details: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined,
     });
   }
 };
