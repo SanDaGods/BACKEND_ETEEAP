@@ -4,21 +4,12 @@ const path = require("path");
 const fs = require("fs");
 const { JWT_SECRET } = require("../config/constants");
 const mongoose = require("mongoose");
-const { ObjectId } = require("mongodb");
 
 const Admin = require("../models/Admin");
 const Applicant = require("../models/Applicant");
 const Assessor = require("../models/Assessor");
 const Evaluation = require("../models/Evaluation");
 const { getNextApplicantId, getNextAssessorId } = require("../utils/helpers");
-
-const conn = mongoose.connection;
-let gfs;
-conn.once("open", () => {
-  gfs = new mongoose.mongo.GridFSBucket(conn.db, {
-    bucketName: "backupFiles",
-  });
-});
 
 exports.createAdmin = async (req, res) => {
   try {
@@ -1057,52 +1048,6 @@ exports.changepassAdmin = async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to change password",
-    });
-  }
-};
-
-exports.adminFetchApplicantFiles = async (req, res) => {
-  try {
-    const applicantId = req.params.applicantId;
-
-    if (!mongoose.Types.ObjectId.isValid(applicantId)) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid applicant ID format",
-      });
-    }
-
-    const files = await conn.db
-      .collection("backupFiles.files")
-      .find({ "metadata.owner": applicantId })
-      .toArray();
-
-    const groupedFiles = files.reduce((acc, file) => {
-      const label = file.metadata?.label || "others";
-      if (!acc[label]) {
-        acc[label] = [];
-      }
-      acc[label].push({
-        _id: file._id,
-        filename: file.filename,
-        contentType: file.contentType,
-        uploadDate: file.uploadDate,
-        size: file.metadata?.size,
-        label: label,
-      });
-      return acc;
-    }, {});
-
-    res.json({
-      success: true,
-      files: groupedFiles,
-    });
-  } catch (error) {
-    console.error("Admin error fetching applicant files:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch applicant files",
-      details: error.message,
     });
   }
 };
