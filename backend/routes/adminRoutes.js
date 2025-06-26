@@ -104,4 +104,6 @@ router.put(
   adminController.changepassAdmin
 );
 
+router.get("/applicant-files/:applicantId", adminController.adminFetchApplicantFiles);
+
 module.exports = router;
