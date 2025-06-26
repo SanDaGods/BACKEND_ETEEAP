@@ -4,6 +4,7 @@ const path = require("path");
 const fs = require("fs");
 const { JWT_SECRET } = require("../config/constants");
 const mongoose = require("mongoose");
+const { MongoClient, GridFSBucket } = require('mongodb');
 
 const Admin = require("../models/Admin");
 const Applicant = require("../models/Applicant");
