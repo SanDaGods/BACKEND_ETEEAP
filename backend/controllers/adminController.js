@@ -6,7 +6,8 @@ const { JWT_SECRET } = require("../config/constants");
 const mongoose = require("mongoose");
 
 const Admin = require("../models/Admin");
-const Applicant = require("../models/Applicant");
+const Applicant = require('../models/Applicant');
+
 const Assessor = require("../models/Assessor");
 const Evaluation = require("../models/Evaluation");
 const { getNextApplicantId, getNextAssessorId } = require("../utils/helpers");
@@ -1050,4 +1051,53 @@ exports.changepassAdmin = async (req, res) => {
       error: "Failed to change password",
     });
   }
+};
+
+exports.fetchApplicantFiles = async (req, res) => {
+    try {
+        const applicantId = req.params.id;
+
+        if (!mongoose.Types.ObjectId.isValid(applicantId)) {
+            return res.status(400).json({
+                success: false,
+                error: "Invalid applicant ID"
+            });
+        }
+
+        const applicant = await Applicant.findById(applicantId)
+            .select('files');
+
+        if (!applicant) {
+            return res.status(404).json({
+                success: false,
+                error: "Applicant not found"
+            });
+        }
+
+        // Format the files data for response
+        const formattedFiles = {};
+        if (applicant.files) {
+            Object.keys(applicant.files).forEach(label => {
+                formattedFiles[label] = applicant.files[label].map(file => ({
+                    _id: file._id,
+                    filename: file.filename,
+                    contentType: file.contentType,
+                    uploadDate: file.uploadDate,
+                    url: `/api/fetch-documents/${file._id}` // URL to fetch the actual file
+                }));
+            });
+        }
+
+        res.status(200).json({
+            success: true,
+            data: formattedFiles
+        });
+
+    } catch (error) {
+        console.error("Error fetching applicant files:", error);
+        res.status(500).json({
+            success: false,
+            error: "Failed to fetch applicant files"
+        });
+    }
 };
