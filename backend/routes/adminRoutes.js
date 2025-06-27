@@ -104,4 +104,48 @@ router.put(
   adminController.changepassAdmin
 );
 
+router.get(
+  "/api/admin/applicants/:id/documents",
+  adminAuthMiddleware,
+  async (req, res) => {
+    try {
+      const applicantId = req.params.id;
+      
+      if (!mongoose.Types.ObjectId.isValid(applicantId)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid applicant ID format",
+        });
+      }
+
+      const files = await conn.db
+        .collection("backupFiles.files")
+        .find({
+          "metadata.owner": applicantId,
+        })
+        .toArray();
+
+      res.json({
+        success: true,
+        files: files.map(file => ({
+          _id: file._id,
+          filename: file.filename,
+          contentType: file.contentType,
+          uploadDate: file.uploadDate,
+          size: file.metadata?.size,
+          label: file.metadata?.label || 'others',
+          metadata: file.metadata
+        }))
+      });
+    } catch (error) {
+      console.error("Error fetching applicant documents:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch documents",
+        details: error.message,
+      });
+    }
+  }
+);
+
 module.exports = router;
