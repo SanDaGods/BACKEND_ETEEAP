@@ -14,49 +14,14 @@ router.get(
 );
 router.get("/assessor/auth-status", assessorController.authstatus);
 router.post("/assessor/logout", assessorController.logout);
-router.get(
-  "/api/assessor/applicants",
-  assessorAuthMiddleware,
-  assessorController.fetchApplicant
-);
-router.get(
-  "/api/assessor/applicants/:id",
-  assessorAuthMiddleware,
-  assessorController.fetchApplicant2
-);
-router.get(
-  "/api/assessor/applicant-documents/:applicantId",
-  assessorAuthMiddleware,
-  assessorController.files
-);
-router.get(
-  "/api/evaluations",
-  assessorAuthMiddleware,
-  assessorController.evaluations
-);
-router.post(
-  "/api/evaluations",
-  assessorAuthMiddleware,
-  assessorController.evaluations2
-);
-router.post(
-  "/api/evaluations/finalize",
-  assessorAuthMiddleware,
-  assessorController.finalize
-);
-router.get(
-  "/api/evaluations/applicant/:applicantId",
-  assessorAuthMiddleware,
-  assessorController.fetchEvaluation
-);
-
-// Add this new route
+// Update the documents route in assessorRoute.js
 router.get(
   "/api/assessor/applicants/:id/documents",
   assessorAuthMiddleware,
   async (req, res) => {
     try {
       const applicantId = req.params.id;
+      const Applicant = require("../models/applicantModel"); // Make sure to import the Applicant model
       
       if (!mongoose.Types.ObjectId.isValid(applicantId)) {
         return res.status(400).json({
@@ -78,12 +43,20 @@ router.get(
         });
       }
 
+      // Use GridFS to fetch files
       const files = await mongoose.connection.db
-        .collection("backupFiles.files")
+        .collection("fs.files")
         .find({
-          "metadata.owner": applicantId,
+          "metadata.owner": new mongoose.Types.ObjectId(applicantId)
         })
         .toArray();
+
+      if (!files || files.length === 0) {
+        return res.status(404).json({
+          success: false,
+          error: "No documents found for this applicant",
+        });
+      }
 
       // Group files by label
       const groupedFiles = files.reduce((acc, file) => {
@@ -96,8 +69,9 @@ router.get(
           filename: file.filename,
           contentType: file.contentType,
           uploadDate: file.uploadDate,
-          size: file.metadata?.size,
+          size: file.length,
           label: label,
+          category: file.metadata?.category
         });
         return acc;
       }, {});
