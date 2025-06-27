@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const router = express.Router();
 const adminController = require("../controllers/adminController");
 const { adminAuthMiddleware } = require("../middleware/authMiddleware");
@@ -118,6 +119,9 @@ router.get(
         });
       }
 
+      // Get the MongoDB connection from mongoose
+      const conn = mongoose.connection;
+      
       const files = await conn.db
         .collection("backupFiles.files")
         .find({
@@ -125,24 +129,33 @@ router.get(
         })
         .toArray();
 
-      res.json({
-        success: true,
-        files: files.map(file => ({
+      // Group files by label
+      const groupedFiles = files.reduce((acc, file) => {
+        const label = file.metadata?.label || "others";
+        if (!acc[label]) {
+          acc[label] = [];
+        }
+        acc[label].push({
           _id: file._id,
           filename: file.filename,
           contentType: file.contentType,
           uploadDate: file.uploadDate,
           size: file.metadata?.size,
-          label: file.metadata?.label || 'others',
-          metadata: file.metadata
-        }))
+          label: label,
+        });
+        return acc;
+      }, {});
+
+      res.json({
+        success: true,
+        files: groupedFiles
       });
     } catch (error) {
       console.error("Error fetching applicant documents:", error);
       res.status(500).json({
         success: false,
         error: "Failed to fetch documents",
-        details: error.message,
+        details: process.env.NODE_ENV === "development" ? error.message : undefined,
       });
     }
   }
