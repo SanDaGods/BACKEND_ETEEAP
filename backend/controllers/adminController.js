@@ -4,23 +4,12 @@ const path = require("path");
 const fs = require("fs");
 const { JWT_SECRET } = require("../config/constants");
 const mongoose = require("mongoose");
-const { GridFSBucket, ObjectId } = require("mongodb");
-const conn = mongoose.connection;
 
 const Admin = require("../models/Admin");
 const Applicant = require("../models/Applicant");
 const Assessor = require("../models/Assessor");
 const Evaluation = require("../models/Evaluation");
 const { getNextApplicantId, getNextAssessorId } = require("../utils/helpers");
-
-
-let gfs;
-conn.once("open", () => {
-  gfs = new GridFSBucket(conn.db, {
-    bucketName: "backupFiles", // Same bucket as applicants use
-  });
-});
-
 
 exports.createAdmin = async (req, res) => {
   try {
@@ -1059,106 +1048,6 @@ exports.changepassAdmin = async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to change password",
-    });
-  }
-};
-
-// Add to adminController.js
-exports.getApplicantFiles = async (req, res) => {
-  try {
-    const applicantId = req.params.id;
-    
-    if (!mongoose.Types.ObjectId.isValid(applicantId)) {
-      return res.status(400).json({
-        success: false,
-        error: "Invalid applicant ID format"
-      });
-    }
-
-    // Convert to ObjectId for proper querying
-    const objectId = new mongoose.Types.ObjectId(applicantId);
-
-    // Fetch files from GridFS with proper owner matching
-    const filesCursor = await conn.db.collection("backupFiles.files")
-      .find({
-        "metadata.owner": objectId
-      })
-      .sort({ "metadata.label": 1, "uploadDate": -1 });
-
-    const files = await filesCursor.toArray();
-
-    // Group files by label with proper structure
-    const groupedFiles = files.reduce((acc, file) => {
-      const label = file.metadata?.label || "others";
-      if (!acc[label]) {
-        acc[label] = [];
-      }
-      acc[label].push({
-        _id: file._id,
-        filename: file.filename,
-        contentType: file.contentType,
-        uploadDate: file.uploadDate,
-        size: file.length,
-        label: label
-      });
-      return acc;
-    }, {});
-
-    res.json({
-      success: true,
-      files: groupedFiles
-    });
-
-  } catch (error) {
-    console.error("Error fetching applicant files:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch applicant files",
-      details: error.message
-    });
-  }
-};
-
-exports.getApplicantFile = async (req, res) => {
-  try {
-    const fileId = new mongoose.Types.ObjectId(req.params.id);
-
-    const file = await conn.db.collection("backupFiles.files").findOne({
-      _id: fileId
-    });
-
-    if (!file) {
-      return res.status(404).json({ 
-        success: false,
-        error: "File not found" 
-      });
-    }
-
-    // Stream the file from GridFS
-    const downloadStream = gfs.openDownloadStream(fileId);
-
-    // Set proper headers
-    res.set("Content-Type", file.contentType);
-    res.set("Content-Disposition", `inline; filename="${file.filename}"`);
-
-    downloadStream.pipe(res);
-
-    downloadStream.on("error", (error) => {
-      console.error("Error streaming file:", error);
-      if (!res.headersSent) {
-        res.status(500).json({ 
-          success: false,
-          error: "Error streaming file" 
-        });
-      }
-    });
-
-  } catch (error) {
-    console.error("Error serving file:", error);
-    res.status(500).json({ 
-      success: false,
-      error: "Failed to serve file",
-      details: error.message
     });
   }
 };

@@ -104,17 +104,4 @@ router.put(
   adminController.changepassAdmin
 );
 
-// Add these routes with proper paths
-router.get(
-  '/api/admin/applicants/:id/files',
-  adminAuthMiddleware,
-  adminController.getApplicantFiles
-);
-
-router.get(
-  '/api/admin/applicants/files/:id',
-  adminAuthMiddleware,
-  adminController.getApplicantFile
-);
-
 module.exports = router;
