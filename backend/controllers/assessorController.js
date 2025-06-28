@@ -585,3 +585,82 @@ exports.fetchEvaluation = async (req, res) => {
     });
   }
 };
+
+// Add these methods to assessorController.js
+
+// Get all documents for an applicant
+exports.files = async (req, res) => {
+  try {
+    const { applicantId } = req.params;
+    
+    // Verify the assessor is assigned to this applicant
+    const applicant = await Applicant.findById(applicantId);
+    if (!applicant) {
+      return res.status(404).json({ success: false, error: 'Applicant not found' });
+    }
+
+    if (applicant.assignedAssessor.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, error: 'Not authorized to view this applicant' });
+    }
+
+    // Group files by their type/category
+    const files = await File.aggregate([
+      { $match: { applicantId: mongoose.Types.ObjectId(applicantId) } },
+      { $group: {
+        _id: "$category",
+        files: { $push: "$$ROOT" }
+      }}
+    ]);
+
+    // Convert array to object with category names as keys
+    const filesByCategory = {};
+    files.forEach(group => {
+      filesByCategory[group._id] = group.files;
+    });
+
+    res.status(200).json({ 
+      success: true, 
+      files: filesByCategory 
+    });
+  } catch (error) {
+    console.error('Error fetching applicant documents:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch documents' });
+  }
+};
+
+// Fetch a specific document
+exports.fetchDocument = async (req, res) => {
+  try {
+    const { fileId } = req.params;
+    
+    // Find the file
+    const file = await File.findById(fileId);
+    if (!file) {
+      return res.status(404).json({ success: false, error: 'File not found' });
+    }
+
+    // Verify the assessor is assigned to this applicant
+    const applicant = await Applicant.findById(file.applicantId);
+    if (!applicant) {
+      return res.status(404).json({ success: false, error: 'Applicant not found' });
+    }
+
+    if (applicant.assignedAssessor.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, error: 'Not authorized to view this file' });
+    }
+
+    // Set appropriate headers
+    res.set({
+      'Content-Type': file.contentType,
+      'Content-Disposition': `inline; filename="${file.filename}"`
+    });
+
+    // Get file from storage (adjust based on your storage solution)
+    const fileStream = getFileFromStorage(file.path); // Implement this function based on your storage
+    
+    fileStream.pipe(res);
+  } catch (error) {
+    console.error('Error fetching document:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch document' });
+  }
+};
