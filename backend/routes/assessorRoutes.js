@@ -63,6 +63,23 @@ router.get(
         });
       }
 
+      // Verify the applicant is assigned to this assessor
+      const applicant = await Applicant.findById(applicantId);
+      if (!applicant) {
+        return res.status(404).json({
+          success: false,
+          error: "Applicant not found",
+        });
+      }
+
+      // Check if the current assessor is assigned to this applicant
+      if (applicant.assignedAssessor.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          success: false,
+          error: "Not authorized to view this applicant's documents",
+        });
+      }
+
       // Get the MongoDB connection from mongoose
       const conn = mongoose.connection;
       
