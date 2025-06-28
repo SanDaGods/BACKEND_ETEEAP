@@ -1,7 +1,5 @@
 const express = require("express");
-const mongoose = require("mongoose");
 const router = express.Router();
-const Applicant = require('../models/Applicant');
 const assessorController = require("../controllers/assessorController");
 const { assessorAuthMiddleware } = require("../middleware/authMiddleware");
 
@@ -57,56 +55,40 @@ router.get(
     try {
       const applicantId = req.params.id;
       
-      console.log(`Fetching documents for applicant: ${applicantId}`); // Debug log
-      
-      if (!mongoose.Types.ObjectId.isValid(applicantId)) {
-        console.error('Invalid applicant ID format:', applicantId);
-        return res.status(400).json({
-          success: false,
-          error: "Invalid applicant ID format",
-        });
-      }
-
-      // Verify the applicant exists
-      const applicant = await Applicant.findById(applicantId).lean();
+      // Verify this assessor is assigned to this applicant
+      const applicant = await Applicant.findById(applicantId);
       if (!applicant) {
-        console.error('Applicant not found:', applicantId);
         return res.status(404).json({
           success: false,
-          error: "Applicant not found",
+          error: "Applicant not found"
         });
       }
 
-      // Check assessor assignment
-      const isAssigned = applicant.assignedAssessors?.some(
-        assessorId => assessorId.toString() === req.user._id.toString()
-      );
-      
-      if (!isAssigned) {
-        console.error(`Assessor ${req.user._id} not authorized for applicant ${applicantId}`);
+      if (!applicant.assignedAssessors.includes(req.user._id)) {
         return res.status(403).json({
           success: false,
-          error: "Not authorized to view this applicant's documents",
+          error: "Not authorized to view this applicant's documents"
         });
       }
 
-      // Get files from GridFS
+      // Get the MongoDB connection
       const conn = mongoose.connection;
+      
+      // Query files collection where metadata.owner matches applicantId
       const files = await conn.db
         .collection("backupFiles.files")
         .find({
-          "metadata.owner": new mongoose.Types.ObjectId(applicantId) // Ensure proper ObjectId comparison
+          "metadata.owner": applicantId
         })
         .toArray();
 
-      console.log(`Found ${files.length} files for applicant ${applicantId}`); // Debug log
-
       // Group files by label
-      const groupedFiles = {};
-      files.forEach(file => {
+      const groupedFiles = files.reduce((acc, file) => {
         const label = file.metadata?.label || "others";
-        groupedFiles[label] = groupedFiles[label] || [];
-        groupedFiles[label].push({
+        if (!acc[label]) {
+          acc[label] = [];
+        }
+        acc[label].push({
           _id: file._id,
           filename: file.filename,
           contentType: file.contentType,
@@ -114,15 +96,15 @@ router.get(
           size: file.metadata?.size,
           label: label,
         });
-      });
+        return acc;
+      }, {});
 
       res.json({
         success: true,
         files: groupedFiles
       });
-
     } catch (error) {
-      console.error("Detailed error fetching documents:", error);
+      console.error("Error fetching applicant documents:", error);
       res.status(500).json({
         success: false,
         error: "Failed to fetch documents",
