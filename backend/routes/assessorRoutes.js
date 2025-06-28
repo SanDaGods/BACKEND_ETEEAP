@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const router = express.Router();
 const assessorController = require("../controllers/assessorController");
 const { assessorAuthMiddleware } = require("../middleware/authMiddleware");
@@ -28,11 +29,6 @@ router.get(
   assessorController.files
 );
 router.get(
-  "/api/assessor/fetch-documents/:fileId",
-  assessorAuthMiddleware,
-  assessorController.fetchDocument
-);
-router.get(
   "/api/evaluations",
   assessorAuthMiddleware,
   assessorController.evaluations
@@ -51,6 +47,62 @@ router.get(
   "/api/evaluations/applicant/:applicantId",
   assessorAuthMiddleware,
   assessorController.fetchEvaluation
+);
+
+router.get(
+  "/api/assessor/applicants/:id/documents",
+  assessorAuthMiddleware,
+  async (req, res) => {
+    try {
+      const applicantId = req.params.id;
+      
+      if (!mongoose.Types.ObjectId.isValid(applicantId)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid applicant ID format",
+        });
+      }
+
+      // Get the MongoDB connection from mongoose
+      const conn = mongoose.connection;
+      
+      const files = await conn.db
+        .collection("backupFiles.files")
+        .find({
+          "metadata.owner": applicantId,
+        })
+        .toArray();
+
+      // Group files by label
+      const groupedFiles = files.reduce((acc, file) => {
+        const label = file.metadata?.label || "others";
+        if (!acc[label]) {
+          acc[label] = [];
+        }
+        acc[label].push({
+          _id: file._id,
+          filename: file.filename,
+          contentType: file.contentType,
+          uploadDate: file.uploadDate,
+          size: file.metadata?.size,
+          label: label,
+        });
+        return acc;
+      }, {});
+
+      res.json({
+        success: true,
+        files: groupedFiles
+      });
+    } catch (error) {
+      console.error("Error fetching applicant documents:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch documents",
+        details: process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
 );
 
 module.exports = router;
