@@ -1,6 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const router = express.Router();
+const Applicant = require('../models/Applicant');
 const assessorController = require("../controllers/assessorController");
 const { assessorAuthMiddleware } = require("../middleware/authMiddleware");
 
@@ -57,17 +58,15 @@ router.get(
       const applicantId = req.params.id;
       
       if (!mongoose.Types.ObjectId.isValid(applicantId)) {
-        console.error('Invalid applicant ID format:', applicantId);
         return res.status(400).json({
           success: false,
           error: "Invalid applicant ID format",
         });
       }
 
-      // Verify the applicant is assigned to this assessor
-      const applicant = await Applicant.findById(applicantId);
+      // Verify the applicant exists and is assigned to this assessor
+      const applicant = await Applicant.findById(applicantId).lean();
       if (!applicant) {
-        console.error('Applicant not found:', applicantId);
         return res.status(404).json({
           success: false,
           error: "Applicant not found",
@@ -75,18 +74,18 @@ router.get(
       }
 
       // Check if the current assessor is assigned to this applicant
-      if (applicant.assignedAssessor.toString() !== req.user._id.toString()) {
-        console.error(`Assessor ${req.user._id} not authorized for applicant ${applicantId}`);
+      const isAssigned = applicant.assignedAssessors?.some(
+        assessorId => assessorId.toString() === req.user._id.toString()
+      );
+      
+      if (!isAssigned) {
         return res.status(403).json({
           success: false,
           error: "Not authorized to view this applicant's documents",
         });
       }
 
-      // Get the MongoDB connection from mongoose
       const conn = mongoose.connection;
-      
-      console.log(`Fetching files for applicant ${applicantId}`); // Debug log
       const files = await conn.db
         .collection("backupFiles.files")
         .find({
@@ -94,14 +93,10 @@ router.get(
         })
         .toArray();
 
-      console.log(`Found ${files.length} files for applicant ${applicantId}`); // Debug log
-
       // Group files by label
       const groupedFiles = files.reduce((acc, file) => {
         const label = file.metadata?.label || "others";
-        if (!acc[label]) {
-          acc[label] = [];
-        }
+        acc[label] = acc[label] || [];
         acc[label].push({
           _id: file._id,
           filename: file.filename,
@@ -118,12 +113,11 @@ router.get(
         files: groupedFiles
       });
     } catch (error) {
-      console.error("Detailed error fetching documents:", error);
+      console.error("Error fetching documents:", error);
       res.status(500).json({
         success: false,
         error: "Failed to fetch documents",
-        details: error.message, // Always include the error message
-        stack: process.env.NODE_ENV === "development" ? error.stack : undefined,
+        details: process.env.NODE_ENV === "development" ? error.message : undefined,
       });
     }
   }
