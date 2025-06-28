@@ -3,7 +3,7 @@ const router = express.Router();
 const assessorController = require("../controllers/assessorController");
 const { assessorAuthMiddleware } = require("../middleware/authMiddleware");
 const mongoose = require("mongoose");
-const Applicant = require("../models/Applicants"); // Make sure you have this model
+ // Make sure you have this model
 
 router.post("/assessor/register", assessorController.createAssessor);
 router.post("/assessor/login", assessorController.login);
