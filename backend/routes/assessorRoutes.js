@@ -79,7 +79,7 @@ router.get(
       const files = await conn.db
         .collection("backupFiles.files")
         .find({
-          "metadata.owner": applicantId
+          "metadata.owner": new mongoose.Types.ObjectId(applicantId)
         })
         .toArray();
 
