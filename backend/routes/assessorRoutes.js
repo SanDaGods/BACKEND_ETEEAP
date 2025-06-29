@@ -56,6 +56,14 @@ router.get(
     try {
       const applicantId = req.params.id;
       
+      // Validate the applicantId format
+      if (!mongoose.Types.ObjectId.isValid(applicantId)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid applicant ID format"
+        });
+      }
+
       // Verify this assessor is assigned to this applicant
       const applicant = await Applicant.findById(applicantId);
       if (!applicant) {
@@ -76,29 +84,42 @@ router.get(
       const conn = mongoose.connection;
       
       // Query files collection where metadata.owner matches applicantId
+      // Try both string and ObjectId formats since we're not sure how it's stored
       const files = await conn.db
         .collection("backupFiles.files")
         .find({
-          "metadata.owner": new mongoose.Types.ObjectId(applicantId)
+          $or: [
+            { "metadata.owner": applicantId }, // Try as string
+            { "metadata.owner": new mongoose.Types.ObjectId(applicantId) } // Try as ObjectId
+          ]
         })
         .toArray();
 
+      console.log("Found files:", files); // Debug logging
+
       // Group files by label
-      const groupedFiles = files.reduce((acc, file) => {
+      const groupedFiles = {};
+      
+      files.forEach(file => {
         const label = file.metadata?.label || "others";
-        if (!acc[label]) {
-          acc[label] = [];
+        if (!groupedFiles[label]) {
+          groupedFiles[label] = [];
         }
-        acc[label].push({
-          _id: file._id,
+        
+        // Ensure we have the correct file ID format
+        const fileId = file._id instanceof mongoose.Types.ObjectId 
+          ? file._id 
+          : new mongoose.Types.ObjectId(file._id);
+        
+        groupedFiles[label].push({
+          _id: fileId,
           filename: file.filename,
           contentType: file.contentType,
           uploadDate: file.uploadDate,
           size: file.metadata?.size,
-          label: label,
+          label: label
         });
-        return acc;
-      }, {});
+      });
 
       res.json({
         success: true,
@@ -114,5 +135,15 @@ router.get(
     }
   }
 );
+
+router.get("/api/debug/files", async (req, res) => {
+  try {
+    const conn = mongoose.connection;
+    const allFiles = await conn.db.collection("backupFiles.files").find().toArray();
+    res.json({ success: true, files: allFiles });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
 
 module.exports = router;
