@@ -665,17 +665,3 @@ exports.fetchDocument = async (req, res) => {
   }
 };
 
-// Verify assessor is assigned to applicant
-exports.verifyAssessorAssignment = async (assessorId, applicantId) => {
-  try {
-    const applicant = await Applicant.findOne({
-      _id: applicantId,
-      assignedAssessors: assessorId,
-    }).lean();
-
-    return !!applicant;
-  } catch (error) {
-    console.error("Error verifying assessor assignment:", error);
-    return false;
-  }
-};
