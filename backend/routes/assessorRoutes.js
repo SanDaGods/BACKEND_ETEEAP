@@ -51,7 +51,103 @@ router.get(
   assessorController.fetchEvaluation
 );
 
+router.get(
+  "/api/assessor/applicants/:id/documents",
+  assessorAuthMiddleware,
+  async (req, res) => {
+    try {
+      const applicantId = req.params.id;
+      
+      if (!mongoose.Types.ObjectId.isValid(applicantId)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid applicant ID format",
+        });
+      }
 
+      const files = await conn.db
+        .collection("backupFiles.files")
+        .find({
+          "metadata.owner": applicantId,
+        })
+        .toArray();
+
+      // Group files by label
+      const groupedFiles = files.reduce((acc, file) => {
+        const label = file.metadata?.label || "others";
+        if (!acc[label]) {
+          acc[label] = [];
+        }
+        acc[label].push({
+          _id: file._id,
+          filename: file.filename,
+          contentType: file.contentType,
+          uploadDate: file.uploadDate,
+          size: file.metadata?.size,
+          label: label,
+        });
+        return acc;
+      }, {});
+
+      res.json({
+        success: true,
+        files: groupedFiles
+      });
+    } catch (error) {
+      console.error("Error fetching applicant documents:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch documents",
+        details: process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+);
+
+router.get(
+  "/api/assessor/fetch-documents/:fileId",
+  assessorAuthMiddleware,
+  async (req, res) => {
+    try {
+      const fileId = req.params.fileId;
+      
+      if (!mongoose.Types.ObjectId.isValid(fileId)) {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid file ID format",
+        });
+      }
+
+      const bucket = new GridFSBucket(conn.db, {
+        bucketName: "backupFiles",
+      });
+
+      const file = await conn.db
+        .collection("backupFiles.files")
+        .findOne({ _id: new ObjectId(fileId) });
+
+      if (!file) {
+        return res.status(404).json({
+          success: false,
+          error: "File not found",
+        });
+      }
+
+      res.set("Content-Type", file.contentType);
+      res.set("Content-Disposition", `inline; filename="${file.filename}"`);
+
+      const downloadStream = bucket.openDownloadStream(file._id);
+      downloadStream.pipe(res);
+    } catch (error) {
+      console.error("Error fetching document:", error);
+      res.status(500).json({
+        success: false,
+        error: "Failed to fetch document",
+        details: process.env.NODE_ENV === "development" ? error.message : undefined,
+      });
+    }
+  }
+);
 
 module.exports = router;
 
