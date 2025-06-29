@@ -52,44 +52,6 @@ router.get(
 );
 
 
-router.get(
-  "/api/assessor/documents/:fileId",
-  assessorAuthMiddleware,
-  async (req, res) => {
-    try {
-      const fileId = req.params.fileId;
-      
-      // Validate fileId
-      if (!ObjectId.isValid(fileId)) {
-        return res.status(400).json({ error: "Invalid file ID" });
-      }
-
-      const bucket = new GridFSBucket(conn.db, {
-        bucketName: "backupFiles"
-      });
-
-      const file = await conn.db.collection("backupFiles.files").findOne({
-        _id: new ObjectId(fileId)
-      });
-
-      if (!file) {
-        return res.status(404).json({ error: "File not found" });
-      }
-
-      // Check if the assessor has permission to access this file
-      // (You might want to add additional checks here)
-      
-      res.set("Content-Type", file.contentType);
-      res.set("Content-Disposition", `inline; filename="${file.filename}"`);
-
-      const downloadStream = bucket.openDownloadStream(new ObjectId(fileId));
-      downloadStream.pipe(res);
-    } catch (error) {
-      console.error("Error fetching file:", error);
-      res.status(500).json({ error: "Failed to fetch file" });
-    }
-  }
-);
 
 module.exports = router;
 
