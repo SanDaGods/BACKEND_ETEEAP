@@ -110,6 +110,7 @@ router.get(
   async (req, res) => {
     try {
       const fileId = req.params.fileId;
+      const isDownload = req.query.download === 'true';
       
       if (!mongoose.Types.ObjectId.isValid(fileId)) {
         return res.status(400).json({
@@ -133,8 +134,14 @@ router.get(
         });
       }
 
+      // Set appropriate headers based on whether it's a download or view request
+      if (isDownload) {
+        res.set("Content-Disposition", `attachment; filename="${file.filename}"`);
+      } else {
+        res.set("Content-Disposition", `inline; filename="${file.filename}"`);
+      }
+      
       res.set("Content-Type", file.contentType);
-      res.set("Content-Disposition", `inline; filename="${file.filename}"`);
 
       const downloadStream = bucket.openDownloadStream(file._id);
       downloadStream.pipe(res);
