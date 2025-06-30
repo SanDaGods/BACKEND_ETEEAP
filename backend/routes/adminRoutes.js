@@ -106,55 +106,58 @@ router.put(
 );
 
 router.get(
-  "/api/admin/applicants/:id/documents",
+  "/api/fetch-documents/:fileId",
   adminAuthMiddleware,
   async (req, res) => {
     try {
-      const applicantId = req.params.id;
+      const fileId = req.params.fileId;
       
-      if (!mongoose.Types.ObjectId.isValid(applicantId)) {
+      if (!mongoose.Types.ObjectId.isValid(fileId)) {
         return res.status(400).json({
           success: false,
-          error: "Invalid applicant ID format",
+          error: "Invalid file ID format",
         });
       }
 
-      // Get the MongoDB connection from mongoose
       const conn = mongoose.connection;
-      
-      const files = await conn.db
-        .collection("backupFiles.files")
-        .find({
-          "metadata.owner": applicantId,
-        })
-        .toArray();
-
-      // Group files by label
-      const groupedFiles = files.reduce((acc, file) => {
-        const label = file.metadata?.label || "others";
-        if (!acc[label]) {
-          acc[label] = [];
-        }
-        acc[label].push({
-          _id: file._id,
-          filename: file.filename,
-          contentType: file.contentType,
-          uploadDate: file.uploadDate,
-          size: file.metadata?.size,
-          label: label,
-        });
-        return acc;
-      }, {});
-
-      res.json({
-        success: true,
-        files: groupedFiles
+      const bucket = new mongoose.mongo.GridFSBucket(conn.db, {
+        bucketName: 'backupFiles'
       });
+
+      const file = await conn.db.collection("backupFiles.files").findOne({
+        _id: new mongoose.Types.ObjectId(fileId)
+      });
+
+      if (!file) {
+        return res.status(404).json({
+          success: false,
+          error: "File not found",
+        });
+      }
+
+      // Set proper headers for download
+      res.set({
+        'Content-Type': file.contentType,
+        'Content-Disposition': `attachment; filename="${encodeURIComponent(file.filename)}"`,
+        'Content-Length': file.length
+      });
+
+      const downloadStream = bucket.openDownloadStream(file._id);
+      downloadStream.pipe(res);
+
+      downloadStream.on('error', (error) => {
+        console.error("Error streaming file:", error);
+        res.status(500).json({
+          success: false,
+          error: "Error streaming file"
+        });
+      });
+
     } catch (error) {
-      console.error("Error fetching applicant documents:", error);
+      console.error("Error fetching document:", error);
       res.status(500).json({
         success: false,
-        error: "Failed to fetch documents",
+        error: "Failed to fetch document",
         details: process.env.NODE_ENV === "development" ? error.message : undefined,
       });
     }
