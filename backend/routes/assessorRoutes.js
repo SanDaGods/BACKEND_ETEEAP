@@ -119,10 +119,6 @@ router.get(
         });
       }
 
-      const bucket = new GridFSBucket(conn.db, {
-        bucketName: "backupFiles",
-      });
-
       const file = await conn.db
         .collection("backupFiles.files")
         .findOne({ _id: new ObjectId(fileId) });
@@ -134,14 +130,18 @@ router.get(
         });
       }
 
-      // Set appropriate headers based on whether it's a download or view request
+      // Set appropriate headers
+      res.set("Content-Type", file.contentType);
+      
       if (isDownload) {
         res.set("Content-Disposition", `attachment; filename="${file.filename}"`);
       } else {
         res.set("Content-Disposition", `inline; filename="${file.filename}"`);
       }
-      
-      res.set("Content-Type", file.contentType);
+
+      const bucket = new GridFSBucket(conn.db, {
+        bucketName: "backupFiles",
+      });
 
       const downloadStream = bucket.openDownloadStream(file._id);
       downloadStream.pipe(res);
@@ -150,7 +150,6 @@ router.get(
       res.status(500).json({
         success: false,
         error: "Failed to fetch document",
-        details: process.env.NODE_ENV === "development" ? error.message : undefined,
       });
     }
   }
