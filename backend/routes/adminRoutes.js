@@ -79,11 +79,13 @@ router.get(
   adminAuthMiddleware,
   adminController.fetchEvaluationID
 );
+
 router.get(
   "/api/admin/admins",
   adminAuthMiddleware,
   adminController.fetchAdmins
 );
+
 router.get(
   "/api/admin/admins/:id",
   adminAuthMiddleware,

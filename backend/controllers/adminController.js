@@ -818,28 +818,58 @@ exports.fetchEvaluationID = async (req, res) => {
 
 exports.fetchAdmins = async (req, res) => {
   try {
-    const requestingAdmin = await Admin.findById(req.admin.userId);
-
-    if (!requestingAdmin.isSuperAdmin) {
-      return res.status(403).json({
+    // Verify admin authentication
+    const token = req.cookies.adminToken;
+    if (!token) {
+      return res.status(401).json({
         success: false,
-        error: "Unauthorized - Only super admins can access this resource",
+        error: "Unauthorized - Please login first"
       });
     }
 
+    // Verify token and get admin info
+    const decoded = jwt.verify(token, JWT_SECRET);
+    const requestingAdmin = await Admin.findById(decoded.userId);
+
+    if (!requestingAdmin) {
+      return res.status(401).json({
+        success: false,
+        error: "Unauthorized - Invalid admin credentials"
+      });
+    }
+
+    // Only super admins can access all admin data
+    if (!requestingAdmin.isSuperAdmin) {
+      return res.status(403).json({
+        success: false,
+        error: "Forbidden - Only super admins can access this resource"
+      });
+    }
+
+    // Fetch all admins (excluding sensitive data)
     const admins = await Admin.find({})
-      .select("-password -__v")
+      .select('-password -__v -resetPasswordToken -resetPasswordExpires')
       .sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
-      data: admins,
+      data: admins
     });
+
   } catch (error) {
     console.error("Error fetching admins:", error);
+    
+    // Handle specific JWT errors
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid authentication token"
+      });
+    }
+
     res.status(500).json({
       success: false,
-      error: "Failed to fetch admins",
+      error: "Internal server error while fetching admins"
     });
   }
 };
