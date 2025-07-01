@@ -91,6 +91,7 @@ router.get(
   adminAuthMiddleware,
   adminController.fetchAdminID
 );
+
 router.put(
   "/api/admin/admins/:id",
   adminAuthMiddleware,
