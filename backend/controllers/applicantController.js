@@ -460,6 +460,7 @@ exports.authStatus = async (req, res) => {
       authenticated: true,
       user: {
         _id: applicant._id,
+        applicantId: applicant.applicantId, // Add this line
         email: applicant.email,
         personalInfo: applicant.personalInfo,
         files: applicant.files,
