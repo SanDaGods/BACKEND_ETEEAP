@@ -164,4 +164,35 @@ router.get(
   }
 );
 
+// In your adminRoute.js
+router.get(
+  "/api/admin/applicants/:id/profile-pic",
+  adminAuthMiddleware,
+  async (req, res) => {
+    try {
+      const applicantId = req.params.id;
+      
+      if (!mongoose.Types.ObjectId.isValid(applicantId)) {
+        return res.status(400).json({ success: false, error: "Invalid applicant ID" });
+      }
+
+      const file = await conn.db.collection("backupFiles.files").findOne({
+        "metadata.userId": applicantId,
+        "metadata.type": "profile-pic",
+      });
+
+      if (!file) {
+        return res.status(404).send("No profile picture found");
+      }
+
+      const downloadStream = gfs.openDownloadStream(file._id);
+      res.set("Content-Type", file.contentType);
+      downloadStream.pipe(res);
+    } catch (error) {
+      console.error("Error serving profile pic:", error);
+      res.status(500).send("Error retrieving profile picture");
+    }
+  }
+);
+
 module.exports = router;
