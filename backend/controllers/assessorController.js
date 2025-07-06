@@ -212,9 +212,9 @@ exports.fetchApplicant = async (req, res) => {
   try {
     const assessorId = req.assessor.userId;
 
+    // Removed status filter to show all assigned applicants
     const applicants = await Applicant.find({
-      assignedAssessors: assessorId,
-      status: "Under Assessment",
+      assignedAssessors: assessorId
     })
       .select("applicantId personalInfo status createdAt finalScore")
       .sort({ createdAt: -1 });
@@ -244,6 +244,41 @@ exports.fetchApplicant = async (req, res) => {
     res.status(500).json({
       success: false,
       error: "Failed to fetch assigned applicants",
+    });
+  }
+};
+
+// Add new delete endpoint
+exports.deleteApplicant = async (req, res) => {
+  try {
+    const { applicantId } = req.params;
+    const assessorId = req.assessor.userId;
+
+    // Verify the applicant is assigned to this assessor
+    const applicant = await Applicant.findOne({
+      _id: applicantId,
+      assignedAssessors: assessorId
+    });
+
+    if (!applicant) {
+      return res.status(404).json({
+        success: false,
+        error: "Applicant not found or not assigned to you"
+      });
+    }
+
+    // Actually delete from database
+    await Applicant.findByIdAndDelete(applicantId);
+
+    res.status(200).json({
+      success: true,
+      message: "Applicant deleted successfully"
+    });
+  } catch (error) {
+    console.error("Error deleting applicant:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to delete applicant"
     });
   }
 };

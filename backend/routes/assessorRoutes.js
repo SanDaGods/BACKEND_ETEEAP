@@ -51,6 +51,14 @@ router.get(
   assessorController.fetchEvaluation
 );
 
+// New DELETE endpoint for applicants
+router.delete(
+  "/api/assessor/applicants/:id",
+  assessorAuthMiddleware,
+  assessorController.deleteApplicant
+);
+
+
 router.get(
   "/api/assessor/applicants/:id/documents",
   assessorAuthMiddleware,
