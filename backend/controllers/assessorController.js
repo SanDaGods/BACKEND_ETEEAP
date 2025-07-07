@@ -251,12 +251,12 @@ exports.fetchApplicant = async (req, res) => {
 // Add new delete endpoint
 exports.deleteApplicant = async (req, res) => {
   try {
-    const { applicantId } = req.params;
+    const { id } = req.params;
     const assessorId = req.assessor.userId;
 
-    // Verify the applicant is assigned to this assessor
+    // Verify the applicant exists and is assigned to this assessor
     const applicant = await Applicant.findOne({
-      _id: applicantId,
+      _id: id,
       assignedAssessors: assessorId
     });
 
@@ -267,8 +267,14 @@ exports.deleteApplicant = async (req, res) => {
       });
     }
 
-    // Actually delete from database
-    await Applicant.findByIdAndDelete(applicantId);
+    // Remove the applicant reference from the assessor's assignedApplicants
+    await Assessor.findByIdAndUpdate(
+      assessorId,
+      { $pull: { assignedApplicants: { applicantId: id } } }
+    );
+
+    // Delete the applicant from database
+    await Applicant.findByIdAndDelete(id);
 
     res.status(200).json({
       success: true,
