@@ -251,16 +251,29 @@ exports.fetchApplicant = async (req, res) => {
 // New unassign endpoint
 exports.unassignApplicant = async (req, res) => {
   try {
-    const { applicantId } = req.params;
+    const { id } = req.params; // Changed from applicantId to id to match route
     const assessorId = req.assessor.userId;
+
+    console.log(`Attempting to unassign applicant ${id} from assessor ${assessorId}`);
+
+    // First verify the assessor exists
+    const assessor = await Assessor.findById(assessorId);
+    if (!assessor) {
+      console.log(`Assessor ${assessorId} not found`);
+      return res.status(404).json({
+        success: false,
+        error: "Assessor not found"
+      });
+    }
 
     // Verify the applicant exists and is assigned to this assessor
     const applicant = await Applicant.findOne({
-      _id: applicantId,
+      _id: id,
       assignedAssessors: assessorId
     });
 
     if (!applicant) {
+      console.log(`Applicant ${id} not found or not assigned to assessor ${assessorId}`);
       return res.status(404).json({
         success: false,
         error: "Applicant not found or not assigned to you"
@@ -269,16 +282,19 @@ exports.unassignApplicant = async (req, res) => {
 
     // Remove assessor from applicant's assignedAssessors
     await Applicant.findByIdAndUpdate(
-      applicantId,
-      { $pull: { assignedAssessors: assessorId } }
+      id,
+      { $pull: { assignedAssessors: assessorId } },
+      { new: true }
     );
 
     // Remove applicant from assessor's assignedApplicants
     await Assessor.findByIdAndUpdate(
       assessorId,
-      { $pull: { assignedApplicants: { applicantId: applicantId } } }
+      { $pull: { assignedApplicants: { applicantId: id } } },
+      { new: true }
     );
 
+    console.log(`Successfully unassigned applicant ${id} from assessor ${assessorId}`);
     res.status(200).json({
       success: true,
       message: "Applicant unassigned successfully"
