@@ -52,7 +52,7 @@ router.get(
 );
 
 // New PATCH endpoint for unassigning applicants
-router.patch(
+router.post(
   "/api/assessor/applicants/:id/unassign",
   assessorAuthMiddleware,
   assessorController.unassignApplicant

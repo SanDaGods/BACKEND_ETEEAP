@@ -23,23 +23,23 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// ✅ **FIXED CORS CONFIGURATION**
+// Update CORS configuration
 app.use(
   cors({
     origin: [
       "https://frontendeteeap-production.up.railway.app",
       "http://localhost:3000",
       "https://updated-backend-production-ff82.up.railway.app",
-      "https://backendeteeap-production.up.railway.app"// Add your backend domain too
+      "https://backendeteeap-production.up.railway.app"
     ],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], // Added PATCH here
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     exposedHeaders: ["Content-Length", "Authorization"]
   })
 );
 
-// Add OPTIONS handler for preflight requests
+// Ensure OPTIONS handler is properly configured
 app.options('*', cors());
 
 // ✅ Routes
