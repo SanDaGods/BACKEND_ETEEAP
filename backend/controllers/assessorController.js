@@ -248,15 +248,15 @@ exports.fetchApplicant = async (req, res) => {
   }
 };
 
-// Add new delete endpoint
-exports.deleteApplicant = async (req, res) => {
+// New unassign endpoint
+exports.unassignApplicant = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { applicantId } = req.params;
     const assessorId = req.assessor.userId;
 
     // Verify the applicant exists and is assigned to this assessor
     const applicant = await Applicant.findOne({
-      _id: id,
+      _id: applicantId,
       assignedAssessors: assessorId
     });
 
@@ -267,27 +267,31 @@ exports.deleteApplicant = async (req, res) => {
       });
     }
 
-    // Remove the applicant reference from the assessor's assignedApplicants
-    await Assessor.findByIdAndUpdate(
-      assessorId,
-      { $pull: { assignedApplicants: { applicantId: id } } }
+    // Remove assessor from applicant's assignedAssessors
+    await Applicant.findByIdAndUpdate(
+      applicantId,
+      { $pull: { assignedAssessors: assessorId } }
     );
 
-    // Delete the applicant from database
-    await Applicant.findByIdAndDelete(id);
+    // Remove applicant from assessor's assignedApplicants
+    await Assessor.findByIdAndUpdate(
+      assessorId,
+      { $pull: { assignedApplicants: { applicantId: applicantId } } }
+    );
 
     res.status(200).json({
       success: true,
-      message: "Applicant deleted successfully"
+      message: "Applicant unassigned successfully"
     });
   } catch (error) {
-    console.error("Error deleting applicant:", error);
+    console.error("Error unassigning applicant:", error);
     res.status(500).json({
       success: false,
-      error: "Failed to delete applicant"
+      error: "Failed to unassign applicant"
     });
   }
 };
+
 
 exports.fetchApplicant2 = async (req, res) => {
   try {

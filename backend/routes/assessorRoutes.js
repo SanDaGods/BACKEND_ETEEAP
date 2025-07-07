@@ -51,11 +51,11 @@ router.get(
   assessorController.fetchEvaluation
 );
 
-// New DELETE endpoint for applicants
-router.delete(
-  "/api/assessor/applicants/:id",
+// New PATCH endpoint for unassigning applicants
+router.patch(
+  "/api/assessor/applicants/:id/unassign",
   assessorAuthMiddleware,
-  assessorController.deleteApplicant
+  assessorController.unassignApplicant
 );
 
 // Add to assessorRoute.js
