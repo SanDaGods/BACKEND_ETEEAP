@@ -699,3 +699,56 @@ exports.fetchDocument = async (req, res) => {
     res.status(500).json({ success: false, error: 'Failed to fetch document' });
   }
 };
+
+
+// Add to assessorController.js
+exports.recordPoints = async (req, res) => {
+  try {
+    const { applicantId, category, points, comments } = req.body;
+    const assessorId = req.assessor.userId;
+
+    // Validate input
+    if (!applicantId || !category || points === undefined) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required fields"
+      });
+    }
+
+    // Find or create evaluation
+    let evaluation = await Evaluation.findOne({
+      applicantId,
+      assessorId
+    });
+
+    if (!evaluation) {
+      evaluation = new Evaluation({
+        applicantId,
+        assessorId,
+        [category]: {
+          score: points,
+          comments: comments || ""
+        }
+      });
+    } else {
+      evaluation[category] = {
+        score: points,
+        comments: comments || "",
+        updatedAt: new Date()
+      };
+    }
+
+    await evaluation.save();
+
+    res.status(200).json({
+      success: true,
+      message: "Points recorded successfully"
+    });
+  } catch (error) {
+    console.error("Error recording points:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to record points"
+    });
+  }
+};

@@ -58,6 +58,12 @@ router.delete(
   assessorController.deleteApplicant
 );
 
+// Add to assessorRoute.js
+router.post(
+  "/api/record-points",
+  assessorAuthMiddleware,
+  assessorController.recordPoints
+);
 
 router.get(
   "/api/assessor/applicants/:id/documents",
