@@ -5,6 +5,7 @@ const bodyParser = require("body-parser");
 const path = require("path");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
+const fs = require("fs");
 
 const connectDB = require("./config/db");
 const { PORT } = require("./config/constants");
@@ -44,25 +45,47 @@ app.options('*', cors());
 
 // Enhanced logging middleware
 app.use((req, res, next) => {
-  console.log(`Incoming request: ${req.method} ${req.path}`);
-  console.log(`Current directory: ${__dirname}`);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
 
-// Set the correct path to your frontend files
-const frontendPath = path.join(__dirname, 'frontend', 'client', 'applicant', 'home');
-console.log(`Frontend path: ${frontendPath}`);
+// 1. First try: Assume frontend is in ../frontend (if server.js is in backend folder)
+let frontendPath = path.resolve(__dirname, '..', 'frontend', 'client', 'applicant', 'home');
+console.log(`Trying frontend path (option 1): ${frontendPath}`);
 
-// Verify the path exists
-const fs = require('fs');
 if (!fs.existsSync(frontendPath)) {
-  console.error('ERROR: Frontend directory does not exist at:', frontendPath);
-} else {
-  console.log('Frontend directory exists. Contents:', fs.readdirSync(frontendPath));
+  console.log('Path not found, trying alternative locations...');
+  
+  // 2. Second try: Assume frontend is in ./frontend (if server.js is in root)
+  frontendPath = path.resolve(__dirname, 'frontend', 'client', 'applicant', 'home');
+  console.log(`Trying frontend path (option 2): ${frontendPath}`);
+  
+  if (!fs.existsSync(frontendPath)) {
+    // 3. Third try: Absolute path from project root
+    frontendPath = path.resolve(process.cwd(), 'frontend', 'client', 'applicant', 'home');
+    console.log(`Trying frontend path (option 3): ${frontendPath}`);
+    
+    if (!fs.existsSync(frontendPath)) {
+      console.error('❌ ERROR: Could not locate frontend directory at any standard location');
+      console.log('Current working directory:', process.cwd());
+      console.log('__dirname:', __dirname);
+      console.log('Contents of project root:', fs.readdirSync(process.cwd()));
+    }
+  }
 }
 
-// Serve static files from the frontend directory
-app.use(express.static(frontendPath));
+if (fs.existsSync(frontendPath)) {
+  console.log('✅ Found frontend directory at:', frontendPath);
+  console.log('Directory contents:', fs.readdirSync(frontendPath));
+  
+  // Serve static files from the frontend directory
+  app.use(express.static(frontendPath));
+  
+  // Serve other static assets if needed
+  app.use('/assets', express.static(path.join(frontendPath, 'assets')));
+} else {
+  console.error('❌ Frontend files not found. Please check your project structure.');
+}
 
 // API routes - prefixed with /api to avoid conflicts
 app.use("/api", routes);
@@ -83,19 +106,34 @@ app.get('/health', (req, res) => {
 
 // Serve index.html for all non-API GET requests
 app.get('*', (req, res) => {
+  if (!frontendPath || !fs.existsSync(frontendPath)) {
+    return res.status(500).json({
+      error: 'Frontend configuration error',
+      message: 'Server cannot locate frontend files'
+    });
+  }
+
   const indexPath = path.join(frontendPath, 'index.html');
   console.log(`Attempting to serve index.html from: ${indexPath}`);
   
   if (!fs.existsSync(indexPath)) {
-    console.error('ERROR: index.html not found at:', indexPath);
-    return res.status(404).send('index.html not found');
+    console.error('❌ ERROR: index.html not found at:', indexPath);
+    return res.status(404).json({
+      error: 'index.html not found',
+      absolutePath: indexPath,
+      currentDirContents: fs.readdirSync(path.dirname(indexPath))
+    });
   }
 
   try {
     res.sendFile(indexPath);
   } catch (err) {
     console.error('Error serving index.html:', err);
-    res.status(500).send('Error loading application');
+    res.status(500).json({
+      error: 'Error loading application',
+      message: err.message,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    });
   }
 });
 
@@ -112,7 +150,11 @@ app.use((err, req, res, next) => {
 
 // Start the server
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Landing page should be available at: http://localhost:${PORT}`);
-  console.log(`Static files path: ${frontendPath}`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🌐 Landing page should be available at: http://localhost:${PORT}`);
+  if (frontendPath && fs.existsSync(frontendPath)) {
+    console.log(`📁 Serving frontend from: ${frontendPath}`);
+  } else {
+    console.error('⚠️  Warning: Frontend path not properly configured');
+  }
 });
