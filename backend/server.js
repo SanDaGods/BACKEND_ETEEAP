@@ -48,17 +48,19 @@ app.use((req, res, next) => {
   next();
 });
 
-// Serve static files from the frontend directory
-app.use(express.static(path.join(__dirname, 'frontend', 'client', 'applicant', 'home')));
-app.use(express.static(path.join(__dirname, 'frontend', 'client', 'applicant', 'home', 'assets'))); // If you have an assets folder
+// Set the correct path to your frontend files
+const frontendPath = path.join(__dirname, 'frontend', 'client', 'applicant', 'home');
 
-// Serve index.html for the root route
-app.get('/', (req, res) => {
+// Serve static files from the frontend directory
+app.use(express.static(frontendPath));
+
+// Serve index.html for the root route and all other routes (for SPA)
+app.get('*', (req, res) => {
   try {
-    res.sendFile(path.join(__dirname, 'frontend', 'client', 'applicant', 'home', 'index.html'));
+    res.sendFile(path.join(frontendPath, 'index.html'));
   } catch (err) {
     console.error('Error serving index.html:', err);
-    res.status(500).send('Error loading landing page');
+    res.status(500).send('Error loading application');
   }
 });
 
@@ -90,17 +92,9 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler for unmatched routes
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'Endpoint not found'
-  });
-});
-
 // Start the server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Landing page should be available at: http://localhost:${PORT}`);
-  console.log(`Static files path: ${path.join(__dirname, 'frontend', 'client', 'applicant', 'home')}`);
+  console.log(`Static files path: ${frontendPath}`);
 });
