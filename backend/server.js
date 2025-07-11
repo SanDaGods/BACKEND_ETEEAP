@@ -82,6 +82,14 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Add this after your middleware but before your API routes
+app.use(express.static(path.join(__dirname, 'frontend', 'client', 'applicant', 'home')));
+
+// Serve index.html for the root route
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'frontend', 'client', 'applicant', 'home', 'index.html'));
+});
+
 // ✅ Start the server
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
