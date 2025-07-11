@@ -42,27 +42,27 @@ app.use(
 // OPTIONS handler
 app.options('*', cors());
 
-// Log incoming requests
+// Enhanced logging middleware
 app.use((req, res, next) => {
   console.log(`Incoming request: ${req.method} ${req.path}`);
+  console.log(`Current directory: ${__dirname}`);
   next();
 });
 
 // Set the correct path to your frontend files
 const frontendPath = path.join(__dirname, 'frontend', 'client', 'applicant', 'home');
+console.log(`Frontend path: ${frontendPath}`);
+
+// Verify the path exists
+const fs = require('fs');
+if (!fs.existsSync(frontendPath)) {
+  console.error('ERROR: Frontend directory does not exist at:', frontendPath);
+} else {
+  console.log('Frontend directory exists. Contents:', fs.readdirSync(frontendPath));
+}
 
 // Serve static files from the frontend directory
 app.use(express.static(frontendPath));
-
-// Serve index.html for the root route and all other routes (for SPA)
-app.get('*', (req, res) => {
-  try {
-    res.sendFile(path.join(frontendPath, 'index.html'));
-  } catch (err) {
-    console.error('Error serving index.html:', err);
-    res.status(500).send('Error loading application');
-  }
-});
 
 // API routes - prefixed with /api to avoid conflicts
 app.use("/api", routes);
@@ -79,6 +79,24 @@ app.get('/health', (req, res) => {
       status: 'healthy'
     });
   });
+});
+
+// Serve index.html for all non-API GET requests
+app.get('*', (req, res) => {
+  const indexPath = path.join(frontendPath, 'index.html');
+  console.log(`Attempting to serve index.html from: ${indexPath}`);
+  
+  if (!fs.existsSync(indexPath)) {
+    console.error('ERROR: index.html not found at:', indexPath);
+    return res.status(404).send('index.html not found');
+  }
+
+  try {
+    res.sendFile(indexPath);
+  } catch (err) {
+    console.error('Error serving index.html:', err);
+    res.status(500).send('Error loading application');
+  }
 });
 
 // Error handling middleware
