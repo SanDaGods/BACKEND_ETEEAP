@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
+const path = require("path");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 
@@ -22,56 +23,45 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// CORS configuration - update with your frontend URL
+// Update CORS configuration
 app.use(
   cors({
     origin: [
-      "https://frontendeteeap-production.up.railway.app", // Your frontend URL
-      "http://localhost:3000" // For local development
+      "https://frontendeteeap-production.up.railway.app",
+      "http://localhost:3000",
+      "https://updated-backend-production-ff82.up.railway.app",
+      "https://backendeteeap-production.up.railway.app"
     ],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], // Added PATCH here
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     exposedHeaders: ["Content-Length", "Authorization"]
   })
 );
 
-// OPTIONS handler
+// Ensure OPTIONS handler is properly configured
 app.options('*', cors());
 
-// Logging middleware
+// ✅ Routes
+app.use("/", routes, applicants, assessors, admins);
+
+// ✅ Error handling middleware
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  res.status(500).json({
+    success: false,
+    error: "Internal server error",
+    details: process.env.NODE_ENV === "production" ? undefined : err.message,
+  });
+});
+
+// Add this before your routes
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  console.log(`Incoming request: ${req.method} ${req.path}`);
   next();
 });
 
-// API routes
-app.use("/api", routes);
-app.use("/api/applicants", applicants);
-app.use("/api/admins", admins);
-app.use("/api/assessors", assessors);
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  mongoose.connection.db.admin().ping((err) => {
-    if (err) return res.status(503).json({ db: 'disconnected' });
-    res.json({ 
-      db: 'connected',
-      status: 'healthy'
-    });
-  });
-});
-
-// Simple root endpoint
-app.get('/', (req, res) => {
-  res.json({
-    message: "ETEEAP Tracking System API",
-    status: "running",
-    frontend: "This is a backend-only deployment. Frontend is served separately."
-  });
-});
-
-// Error handling middleware
+// Add this after your routes
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({
@@ -82,8 +72,17 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start the server
+app.get('/health', (req, res) => {
+  mongoose.connection.db.admin().ping((err) => {
+    if (err) return res.status(503).json({ db: 'disconnected' });
+    res.json({ 
+      db: 'connected',
+      gridfs: gfs ? 'ready' : 'not initialized'
+    });
+  });
+});
+
+// ✅ Start the server
 app.listen(PORT, () => {
-  console.log(`🚀 Backend server running on port ${PORT}`);
-  console.log(`🌐 API endpoints available at: http://localhost:${PORT}/api`);
+  console.log(`Server running at http://localhost:${PORT}`);
 });
