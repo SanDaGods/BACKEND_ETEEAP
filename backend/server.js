@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
+const path = require("path");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
 
@@ -22,80 +23,66 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// Enhanced CORS configuration
-const allowedOrigins = [
-  "https://frontendeteeap-production.up.railway.app",
-  "http://localhost:3000",
-  "https://updated-backend-production-ff82.up.railway.app",
-  "https://backendeteeap-production.up.railway.app"
-];
-
+// Update CORS configuration
 app.use(
   cors({
-    origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
-      if (!origin) return callback(null, true);
-      
-      if (allowedOrigins.indexOf(origin) === -1) {
-        const msg = `The CORS policy for this site does not allow access from the specified Origin: ${origin}`;
-        return callback(new Error(msg), false);
-      }
-      return callback(null, true);
-    },
+    origin: [
+      "https://frontendeteeap-production.up.railway.app",
+      "http://localhost:3000",
+      "https://updated-backend-production-ff82.up.railway.app",
+      "https://backendeteeap-production.up.railway.app"
+    ],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], // Added PATCH here
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     exposedHeaders: ["Content-Length", "Authorization"]
   })
 );
 
-// Pre-flight requests
+// Ensure OPTIONS handler is properly configured
 app.options('*', cors());
 
-// API Routes
-app.use("/api", routes, applicants, assessors, admins);
+// ✅ Routes
+app.use("/", routes, applicants, assessors, admins);
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  mongoose.connection.db.admin().ping((err) => {
-    if (err) return res.status(503).json({ db: 'disconnected' });
-    res.json({ 
-      db: 'connected',
-      status: 'ok',
-      message: 'Backend is running successfully',
-      frontend: 'https://frontendeteeap-production.up.railway.app'
-    });
+// ✅ Error handling middleware
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  res.status(500).json({
+    success: false,
+    error: "Internal server error",
+    details: process.env.NODE_ENV === "production" ? undefined : err.message,
   });
 });
 
-// Request logging middleware
+// Add this before your routes
 app.use((req, res, next) => {
   console.log(`Incoming request: ${req.method} ${req.path}`);
   next();
 });
 
-// Error handling middleware
+// Add this after your routes
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({
     success: false,
     error: 'Internal Server Error',
     message: process.env.NODE_ENV === 'development' ? err.message : undefined,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
   });
 });
 
-// Catch-all for undefined routes
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    error: 'Endpoint not found',
-    message: `The requested route ${req.path} does not exist on this server.`,
-    api_docs: 'Check your API documentation for available endpoints'
+app.get('/health', (req, res) => {
+  mongoose.connection.db.admin().ping((err) => {
+    if (err) return res.status(503).json({ db: 'disconnected' });
+    res.json({ 
+      db: 'connected',
+      gridfs: gfs ? 'ready' : 'not initialized'
+    });
   });
 });
 
-// Start the server
+// ✅ Start the server
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Frontend is served separately at: https://frontendeteeap-production.up.railway.app`);
+  console.log(`Server running at http://localhost:${PORT}`);
 });
