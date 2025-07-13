@@ -15,15 +15,15 @@ const assessors = require("./routes/assessorRoutes");
 
 const app = express();
 
-// Connect to MongoDB
+// ✅ Connect to MongoDB
 connectDB();
 
-// Middleware
+// ✅ Middleware
 app.use(express.json());
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// Update CORS configuration
+// ✅ CORS for frontend + backend domains
 app.use(
   cors({
     origin: [
@@ -33,56 +33,56 @@ app.use(
       "https://backendeteeap-production.up.railway.app"
     ],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], // Added PATCH here
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     exposedHeaders: ["Content-Length", "Authorization"]
   })
 );
 
-// Ensure OPTIONS handler is properly configured
-app.options('*', cors());
+// ✅ Allow preflight for all routes
+app.options("*", cors());
 
-// ✅ Routes
+// ✅ Serve static frontend files (landing page)
+const staticPath = path.join(__dirname, "frontend", "client", "applicant", "home");
+app.use(express.static(staticPath));
+
+// ✅ API Routes
 app.use("/", routes, applicants, assessors, admins);
 
-// ✅ Error handling middleware
-app.use((err, req, res, next) => {
-  console.error("Unhandled error:", err);
-  res.status(500).json({
-    success: false,
-    error: "Internal server error",
-    details: process.env.NODE_ENV === "production" ? undefined : err.message,
+// ✅ Health check
+app.get("/health", (req, res) => {
+  mongoose.connection.db.admin().ping((err) => {
+    if (err) return res.status(503).json({ db: "disconnected" });
+    res.json({
+      db: "connected",
+      gridfs: typeof gfs !== "undefined" ? "ready" : "not initialized"
+    });
   });
 });
 
-// Add this before your routes
+// ✅ Logger for incoming requests
 app.use((req, res, next) => {
   console.log(`Incoming request: ${req.method} ${req.path}`);
   next();
 });
 
-// Add this after your routes
+// ✅ Fallback to index.html for unknown routes (for SPA deep links or home page)
+app.get("*", (req, res) => {
+  res.sendFile(path.join(staticPath, "index.html"));
+});
+
+// ✅ Global error handler
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
+  console.error("Unhandled error:", err);
   res.status(500).json({
     success: false,
-    error: 'Internal Server Error',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined,
-    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
+    error: "Internal Server Error",
+    message: process.env.NODE_ENV === "development" ? err.message : undefined,
+    stack: process.env.NODE_ENV === "development" ? err.stack : undefined
   });
 });
 
-app.get('/health', (req, res) => {
-  mongoose.connection.db.admin().ping((err) => {
-    if (err) return res.status(503).json({ db: 'disconnected' });
-    res.json({ 
-      db: 'connected',
-      gridfs: gfs ? 'ready' : 'not initialized'
-    });
-  });
-});
-
-// ✅ Start the server
+// ✅ Start server
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
