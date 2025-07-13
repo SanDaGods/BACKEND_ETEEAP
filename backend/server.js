@@ -2,10 +2,8 @@ require("dotenv").config();
 const express = require("express");
 const mongoose = require("mongoose");
 const bodyParser = require("body-parser");
-const path = require("path");
 const cookieParser = require("cookie-parser");
 const cors = require("cors");
-const fs = require("fs");
 
 const connectDB = require("./config/db");
 const { PORT } = require("./config/constants");
@@ -24,14 +22,12 @@ app.use(express.json());
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-// CORS configuration
+// CORS configuration - update with your frontend URL
 app.use(
   cors({
     origin: [
-      "https://frontendeteeap-production.up.railway.app",
-      "http://localhost:3000",
-      "https://updated-backend-production-ff82.up.railway.app",
-      "https://backendeteeap-production.up.railway.app"
+      "https://frontendeteeap-production.up.railway.app", // Your frontend URL
+      "http://localhost:3000" // For local development
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
@@ -43,50 +39,13 @@ app.use(
 // OPTIONS handler
 app.options('*', cors());
 
-// Enhanced logging middleware
+// Logging middleware
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
   next();
 });
 
-// Simplified frontend path resolution
-const projectRoot = process.cwd();
-const possibleFrontendPaths = [
-  // Railway likely structure
-  path.join(projectRoot, 'frontend', 'client', 'applicant', 'home'),
-  // Alternative structures
-  path.join(projectRoot, '..', 'frontend', 'client', 'applicant', 'home'),
-  path.join(__dirname, '..', 'frontend', 'client', 'applicant', 'home'),
-  path.join(__dirname, '..', '..', 'frontend', 'client', 'applicant', 'home')
-];
-
-let frontendPath = null;
-
-// Find the first valid frontend path
-for (const possiblePath of possibleFrontendPaths) {
-  console.log(`Checking frontend path: ${possiblePath}`);
-  if (fs.existsSync(possiblePath)) {
-    frontendPath = possiblePath;
-    console.log(`✅ Found frontend at: ${frontendPath}`);
-    break;
-  }
-}
-
-if (frontendPath) {
-  console.log('Frontend directory contents:', fs.readdirSync(frontendPath));
-  
-  // Serve static files
-  app.use(express.static(frontendPath));
-  
-  // Serve assets if needed
-  app.use('/assets', express.static(path.join(frontendPath, 'assets')));
-} else {
-  console.error('❌ Frontend not found at any of these locations:');
-  console.log(possibleFrontendPaths);
-  console.log('Current directory contents:', fs.readdirSync(projectRoot));
-}
-
-// API routes - prefixed with /api
+// API routes
 app.use("/api", routes);
 app.use("/api/applicants", applicants);
 app.use("/api/admins", admins);
@@ -103,54 +62,13 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Debug endpoint to check file structure
-app.get('/debug-structure', (req, res) => {
-  const walk = (dir) => {
-    let results = [];
-    const list = fs.readdirSync(dir);
-    list.forEach(file => {
-      file = path.join(dir, file);
-      const stat = fs.statSync(file);
-      if (stat && stat.isDirectory()) {
-        results = results.concat(walk(file));
-      } else {
-        results.push(file);
-      }
-    });
-    return results;
-  };
-  
+// Simple root endpoint
+app.get('/', (req, res) => {
   res.json({
-    projectRoot,
-    frontendPath,
-    exists: frontendPath ? fs.existsSync(frontendPath) : false,
-    files: walk(projectRoot)
+    message: "ETEEAP Tracking System API",
+    status: "running",
+    frontend: "This is a backend-only deployment. Frontend is served separately."
   });
-});
-
-// Serve index.html for all non-API GET requests
-app.get('*', (req, res) => {
-  if (!frontendPath || !fs.existsSync(frontendPath)) {
-    return res.status(500).json({
-      error: 'Frontend configuration error',
-      message: 'Server cannot locate frontend files',
-      possiblePaths: possibleFrontendPaths,
-      currentStructure: fs.readdirSync(projectRoot)
-    });
-  }
-
-  const indexPath = path.join(frontendPath, 'index.html');
-  
-  if (!fs.existsSync(indexPath)) {
-    console.error('index.html not found at:', indexPath);
-    return res.status(404).json({
-      error: 'index.html not found',
-      path: indexPath,
-      contents: fs.readdirSync(frontendPath)
-    });
-  }
-
-  res.sendFile(indexPath);
 });
 
 // Error handling middleware
@@ -166,14 +84,6 @@ app.use((err, req, res, next) => {
 
 // Start the server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🌐 Landing page should be available at: http://localhost:${PORT}`);
-  
-  if (frontendPath && fs.existsSync(frontendPath)) {
-    console.log(`📁 Serving frontend from: ${frontendPath}`);
-    console.log('Main files available:', fs.readdirSync(frontendPath));
-  } else {
-    console.error('⚠️  Frontend path not properly configured');
-    console.log('Visit /debug-structure endpoint to diagnose');
-  }
+  console.log(`🚀 Backend server running on port ${PORT}`);
+  console.log(`🌐 API endpoints available at: http://localhost:${PORT}/api`);
 });
