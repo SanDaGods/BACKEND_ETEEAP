@@ -33,7 +33,7 @@ app.use(
       "https://backendeteeap-production.up.railway.app"
     ],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"], // Added PATCH here
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
     exposedHeaders: ["Content-Length", "Authorization"]
   })
@@ -42,26 +42,41 @@ app.use(
 // Ensure OPTIONS handler is properly configured
 app.options('*', cors());
 
-// ✅ Routes
-app.use("/", routes, applicants, assessors, admins);
+// Serve static files from the frontend
+// This assumes your frontend is built and you have access to the static files
+// If you're serving a separate frontend deployment, you might not need this
+app.use(express.static(path.join(__dirname, '../../frontend/client/applicant/home')));
 
-// ✅ Error handling middleware
-app.use((err, req, res, next) => {
-  console.error("Unhandled error:", err);
-  res.status(500).json({
-    success: false,
-    error: "Internal server error",
-    details: process.env.NODE_ENV === "production" ? undefined : err.message,
-  });
+// Landing page route - serves index.html
+app.get('/', (req, res) => {
+  // Redirect to the frontend URL if you want to keep them separate
+  // res.redirect('https://frontendeteeap-production.up.railway.app/');
+  
+  // Or serve the index.html directly if you have the files
+  res.sendFile(path.join(__dirname, '../../frontend/client/applicant/home/index.html'));
 });
 
-// Add this before your routes
+// API Routes
+app.use("/api", routes, applicants, assessors, admins);
+
+// Request logging middleware
 app.use((req, res, next) => {
   console.log(`Incoming request: ${req.method} ${req.path}`);
   next();
 });
 
-// Add this after your routes
+// Health check endpoint
+app.get('/health', (req, res) => {
+  mongoose.connection.db.admin().ping((err) => {
+    if (err) return res.status(503).json({ db: 'disconnected' });
+    res.json({ 
+      db: 'connected',
+      status: 'ok'
+    });
+  });
+});
+
+// Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
   res.status(500).json({
@@ -72,17 +87,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-app.get('/health', (req, res) => {
-  mongoose.connection.db.admin().ping((err) => {
-    if (err) return res.status(503).json({ db: 'disconnected' });
-    res.json({ 
-      db: 'connected',
-      gridfs: gfs ? 'ready' : 'not initialized'
-    });
-  });
-});
-
-// ✅ Start the server
+// Start the server
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
 });
